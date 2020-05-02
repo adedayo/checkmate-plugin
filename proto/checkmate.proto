@@ -1,0 +1,25 @@
+syntax = "proto3";
+package checkmate;
+option go_package = ".;checkmate";
+
+enum ResourceType {
+  PATH = 0;
+  SOURCE = 1;
+}
+
+message Resource {
+  string value = 1;
+  ResourceType resource_type = 2;
+}
+
+message ScanRequest { repeated Resource resources = 2; }
+
+service StaticAnalysisService {}
+
+message PluginMetadata {
+  string name = 1;
+  string description = 2;
+}
+
+message Empty {}
+service PluginService { rpc GetPluginMetadata(Empty) returns (PluginMetadata); }
