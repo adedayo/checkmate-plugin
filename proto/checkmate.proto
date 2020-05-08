@@ -17,8 +17,12 @@ message ScanRequest { repeated Resource resources = 2; }
 service StaticAnalysisService {}
 
 message PluginMetadata {
-  string name = 1;
-  string description = 2;
+  // Plugin ID
+  string id = 1;
+  // Plugin display name
+  string name = 2;
+  // A display description
+  string description = 3;
 }
 
 message Empty {}

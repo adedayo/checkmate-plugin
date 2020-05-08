@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
+	plug "github.com/adedayo/checkmate-plugin/pkg"
 	checkmate "github.com/adedayo/checkmate-plugin/proto"
-	plug "github.com/adedayo/checkmate-plugin/shared"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
@@ -22,7 +23,7 @@ var (
 	registry    = make(map[string]*checkmate.PluginMetadata)
 
 	logger = hclog.New(&hclog.LoggerOptions{
-		Name:   "plugin-host",
+		Name:   "plugin-registry",
 		Output: os.Stdout,
 		Level:  hclog.Error,
 	})
@@ -36,8 +37,15 @@ func GetAllPluginMetadata(paths []string) []*checkmate.PluginMetadata {
 	for _, v := range registry {
 		meta = append(meta, v)
 	}
+	sort.Sort(byName(meta))
 	return meta
 }
+
+type byName []*checkmate.PluginMetadata
+
+func (a byName) Len() int           { return len(a) }
+func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 func updateRegistry(paths []string) {
 

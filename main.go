@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 
-	plug "github.com/adedayo/checkmate-plugin/shared"
+	plug "github.com/adedayo/checkmate-plugin/pkg"
 	"github.com/hashicorp/go-plugin"
 )
 
