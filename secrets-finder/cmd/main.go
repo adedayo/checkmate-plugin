@@ -1,8 +1,8 @@
 package main
 
 import (
-	secrets "github.com/adedayo/checkmate-plugin/cmd/plugins/secrets-finder/pkg"
 	model "github.com/adedayo/checkmate-plugin/pkg"
+	secrets "github.com/adedayo/checkmate-plugin/secrets-finder/pkg"
 	"github.com/hashicorp/go-plugin"
 )
 
