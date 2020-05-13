@@ -1,0 +1,37 @@
+syntax = "proto3";
+package checkmate;
+option go_package = ".;checkmate";
+
+message SecurityDiagnostic {
+  Justification justification = 1;
+  Range range = 2;
+  string location = 3;
+  string provider_id = 4;
+  string source = 5;
+}
+
+message Range {
+  Position start = 1;
+  Position end = 2;
+}
+
+message Position {
+  int32 line = 1;
+  int32 character = 2;
+}
+
+message Justification {
+  Evidence headline = 1;
+  repeated Evidence reasons = 2;
+}
+
+message Evidence {
+  string description = 1;
+  Confidence confidence = 2;
+}
+
+enum Confidence {
+  Low = 0;
+  Medium = 1;
+  High = 2;
+}

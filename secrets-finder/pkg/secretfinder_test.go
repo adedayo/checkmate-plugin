@@ -30,30 +30,31 @@ func TestFindSecret(t *testing.T) {
 			value:    `pwd = "232d222x2324c2ecc2c2e"`,
 			provider: assignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
-				diagnostics.Evidence{
+				{
 					Description: descHardCodedSecretAssignment,
 					Confidence:  diagnostics.Medium},
-				diagnostics.Evidence{
+				{
 					Description: descVarSecret,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descNotSecret,
 					Confidence:  diagnostics.Low},
 			},
 		},
+
 		{
 			name:      "Assignment 2",
 			value:     `crypt = "HbjZ!+{c]Y5!kNzB+-p^A6bCt(zNtf=V"`,
 			extension: ".java",
 			provider:  assignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
-				diagnostics.Evidence{
+				{
 					Description: descHardCodedSecretAssignment,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descVarSecret,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descHighEntropy,
 					Confidence:  diagnostics.Medium},
 			},
@@ -63,13 +64,13 @@ func TestFindSecret(t *testing.T) {
 			value:    `PassPhrase4 = "This should trigger a high"`,
 			provider: assignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
-				diagnostics.Evidence{
+				{
 					Description: descHardCodedSecretAssignment,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descVarSecret,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descHardCodedSecret,
 					Confidence:  diagnostics.High},
 			},
@@ -80,13 +81,13 @@ func TestFindSecret(t *testing.T) {
 			extension: ".json",
 			provider:  jsonAssignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
-				diagnostics.Evidence{
+				{
 					Description: descHardCodedSecretAssignment,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descVarSecret,
 					Confidence:  diagnostics.High},
-				diagnostics.Evidence{
+				{
 					Description: descHighEntropy,
 					Confidence:  diagnostics.Medium},
 			},
