@@ -1,20 +1,7 @@
 syntax = "proto3";
 package checkmate;
 option go_package = ".;checkmate";
-
-enum ResourceType {
-  PATH = 0;
-  SOURCE = 1;
-}
-
-message Resource {
-  string value = 1;
-  ResourceType resource_type = 2;
-}
-
-message ScanRequest { repeated Resource resources = 2; }
-
-service StaticAnalysisService {}
+import "diagnostics.proto";
 
 message PluginMetadata {
   // Plugin ID
@@ -23,7 +10,47 @@ message PluginMetadata {
   string name = 2;
   // A display description
   string description = 3;
+  // filesystem path of the plugin
+  string path = 4;
 }
 
 message Empty {}
-service PluginService { rpc GetPluginMetadata(Empty) returns (PluginMetadata); }
+
+enum ScanType {
+  PATH_SCAN = 0;
+  STRING_SCAN = 1;
+}
+
+message DataToScan {
+  string source = 1;
+  string source_type = 2;
+  bool base64 = 3;
+}
+
+message StringList { repeated string value = 1; }
+
+// WhitelistDefinition is the structure for conveying whitelist definitions
+message WhitelistDefinition {
+  repeated string globally_excluded_reg_exs = 1;
+  repeated string globally_excluded_strings = 2;
+  repeated string path_exclusion_reg_exs = 3;
+  map<string, StringList> per_file_excluded_strings = 4;
+  map<string, StringList> path_regex_excluded_reg_exs = 5;
+}
+
+message ScanRequest {
+  ScanType scan_type = 1;
+  // used for PATH_SCAN request type
+  repeated string paths_to_scan = 2;
+  // used for STRING_SCAN request type
+  repeated DataToScan data_to_scan = 3;
+  // whitelists
+  WhitelistDefinition whitelists = 4;
+  // show source code evidence where possible
+  bool show_source = 5;
+}
+
+service PluginService {
+  rpc GetPluginMetadata(Empty) returns (PluginMetadata);
+  rpc Scan(ScanRequest) returns (stream SecurityDiagnostic);
+}

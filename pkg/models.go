@@ -3,7 +3,7 @@ package model
 import (
 	"context"
 
-	checkmate "github.com/adedayo/checkmate-plugin/proto"
+	pb "github.com/adedayo/checkmate-plugin/proto"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )
@@ -18,11 +18,31 @@ var (
 // CheckMatePluginInterface is the interface that all plugins must implement
 type CheckMatePluginInterface interface {
 	//GetPluginMetadata returns meta data description of the plugin
-	GetPluginMetadata() (*checkmate.PluginMetadata, error)
+	GetPluginMetadata() (*pb.PluginMetadata, error)
+	Scan(*pb.ScanRequest, pb.PluginService_ScanServer) error
 }
 
-// CheckMatePlugin is plugin.Plugin implementation
-type CheckMatePlugin struct {
+// CheckMatePluginClientInterface is the interface that plugin clients implement
+type CheckMatePluginClientInterface interface {
+	//GetPluginMetadata returns meta data description of the plugin
+	GetPluginMetadata() (*pb.PluginMetadata, error)
+	Scan(*pb.ScanRequest) error
+}
+
+// PluginMetadata a
+type PluginMetadata struct {
+	//Plugin ID used to serve the plugin
+	ID string
+	//Name of the plugin, for user inter
+	Name string
+	//A display description
+	Description string
+	//A filesystem path from where the plugin should be launched from
+	Path string
+}
+
+// CheckMatePluginContainer is plugin.Plugin implementation
+type CheckMatePluginContainer struct {
 	plugin.Plugin
 	Impl CheckMatePluginInterface
 }
@@ -30,14 +50,14 @@ type CheckMatePlugin struct {
 // GRPCServer registers this plugin for serving with the
 // given GRPCServer. Unlike Plugin.Server, this is only called once
 // since gRPC plugins serve singletons.
-func (p *CheckMatePlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	checkmate.RegisterPluginServiceServer(s, &CheckMatePluginServer{Impl: p.Impl})
+func (p *CheckMatePluginContainer) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
+	pb.RegisterPluginServiceServer(s, &CheckMatePluginServer{Impl: p.Impl})
 	return nil
 }
 
 // GRPCClient returns the interface implementation for the plugin
 // you're serving via gRPC. The provided context will be canceled by
 // go-plugin in the event of the plugin process exiting.
-func (p *CheckMatePlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return &CheckMatePluginClient{client: checkmate.NewPluginServiceClient(c)}, nil
+func (p *CheckMatePluginContainer) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+	return &CheckMatePluginClient{client: pb.NewPluginServiceClient(c)}, nil
 }

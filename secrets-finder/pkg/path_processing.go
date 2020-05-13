@@ -18,8 +18,9 @@ var (
 	gitURL                      = regexp.MustCompile(`\s*(?i:https?://|git@).*`)
 )
 
-//SearchSecretsOnPaths searches for secrets on indicated paths
-func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.DefaultWhitelistProvider) (chan diagnostics.SecurityDiagnostic, chan []string) {
+//SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
+//Streams back security diagnostics and paths
+func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.WhitelistProvider) (chan diagnostics.SecurityDiagnostic, chan []string) {
 	out := make(chan diagnostics.SecurityDiagnostic)
 	pathsOut := make(chan []string)
 	repos, local := determineAndCloneRepositories(paths)
@@ -27,7 +28,7 @@ func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.Defaul
 	for _, path := range repos {
 		paths = append(paths, path)
 	}
-	//reverse local paths to git URL
+	//reverse map local paths to git URLs
 	repoMapper := make(map[string]string)
 	for repo, loc := range repos {
 		repoMapper[loc] = repo
@@ -45,9 +46,9 @@ func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.Defaul
 	}
 	consumers := []util.PathConsumer{
 		&confidentialFilesFinder{
-			DefaultWhitelistProvider: wl,
+			WhitelistProvider: wl,
 		},
-		&pathBasedSecretFinder{showSource: showSource, DefaultWhitelistProvider: wl},
+		&pathBasedSecretFinder{showSource: showSource, WhitelistProvider: wl},
 	}
 	providers := []diagnostics.SecurityDiagnosticsProvider{}
 	for _, c := range consumers {
@@ -60,6 +61,7 @@ func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.Defaul
 	go func() {
 		allFiles := []string{}
 		defer func() {
+			//clean downloaded repositories
 			for _, r := range repos {
 				os.RemoveAll(r)
 			}
@@ -97,7 +99,7 @@ func determineAndCloneRepositories(paths []string) (map[string]string, []string)
 
 type confidentialFilesFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
-	diagnostics.DefaultWhitelistProvider
+	diagnostics.WhitelistProvider
 }
 
 func (cff confidentialFilesFinder) Consume(path string) {
@@ -115,7 +117,7 @@ func (cff confidentialFilesFinder) Consume(path string) {
 					Confidence:  diagnostics.Medium,
 				},
 				Reasons: []diagnostics.Evidence{
-					diagnostics.Evidence{
+					{
 						Description: why,
 						Confidence:  diagnostics.Medium,
 					},
@@ -128,7 +130,7 @@ func (cff confidentialFilesFinder) Consume(path string) {
 
 type pathBasedSecretFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
-	diagnostics.DefaultWhitelistProvider
+	diagnostics.WhitelistProvider
 	showSource bool
 }
 

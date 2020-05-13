@@ -1,8 +1,11 @@
 package secrets
 
 import (
+	"os"
+
+	diagnostics "github.com/adedayo/checkmate-core/pkg/diagnostics"
 	model "github.com/adedayo/checkmate-plugin/pkg"
-	checkmate "github.com/adedayo/checkmate-plugin/proto"
+	pb "github.com/adedayo/checkmate-plugin/proto"
 )
 
 // FinderPlugin is the plugin interface to the CheckMate Secret Finder module
@@ -11,9 +14,32 @@ type FinderPlugin struct {
 }
 
 //GetPluginMetadata returns the plugin metadata
-func (sfp *FinderPlugin) GetPluginMetadata() (*checkmate.PluginMetadata, error) {
-	return &checkmate.PluginMetadata{
+func (sfp *FinderPlugin) GetPluginMetadata() (*pb.PluginMetadata, error) {
+	var path string
+	if exe, err := os.Executable(); err == nil {
+		path = exe
+	}
+	return &pb.PluginMetadata{
 		Description: "CheckMate's secrets-in-code detection plugin",
 		Name:        "Secrets Finder",
+		Id:          "secrets-finder",
+		Path:        path,
 	}, nil
+}
+
+//Scan runs the static analysis scan to find secrets in code and configuration files
+func (sfp *FinderPlugin) Scan(req *pb.ScanRequest, stream pb.PluginService_ScanServer) error {
+
+	wl, err := diagnostics.CompileWhitelists(model.ConvertWhitelistDefinition(req.Whitelists))
+	if err != nil {
+		return err
+	}
+	diags, paths := SearchSecretsOnPaths(req.PathsToScan, req.ShowSource, wl)
+	for diagnostic := range diags {
+		if err := stream.Send(model.ConvertSecurityDiagnostic(&diagnostic)); err != nil {
+			return err
+		}
+	}
+	<-paths
+	return nil
 }

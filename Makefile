@@ -10,6 +10,7 @@ build:
 
 clean:
 	rm -rf build
-	protoc -I proto proto/checkmate.proto --go_out=plugins=grpc:proto
+	rm -f proto/*.pb.go
+	protoc -I proto proto/*.proto --go_out=plugins=grpc:proto
 
 
