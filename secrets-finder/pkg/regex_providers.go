@@ -266,9 +266,10 @@ func (sa *assignmentFinder) Consume(startIndex int, source string) {
 				variable := strings.ToLower(source[match[2]:match[3]])
 				evidence := detectSecret(assignedVal)
 				if strings.Contains(variable, "passphrase") {
+					//special "passphrase" case:
+					//if the assigned variable is a passphrase bypass any result of the assigned value
 					evidence.Description = descHardCodedSecret
 					evidence.Confidence = diagnostics.High
-
 				}
 
 				diagnostic := diagnostics.SecurityDiagnostic{
