@@ -22,9 +22,9 @@ func detectSecret(secret string) (evidence diagnostics.Evidence) {
 		//spaces are unusual to be found in passwords/secrets
 		space.FindStringSubmatchIndex(data) != nil ||
 		//anecdotal passwords in config don't typically start with these characters,
-		//and if it does but is longer than 15 characters, they probably are security-minded
+		//and if it does but is longer than 45 characters, they probably are security-minded
 		//and will know not to put secrets in plaintext, so assume not a secret!
-		(len(data) > 15 && strings.Contains(unusualPasswordStartCharacters, string(data[0]))) {
+		(strings.Contains(unusualPasswordStartCharacters, string(data[0])) && len(data) > 45) {
 		evidence.Description = descNotSecret
 		evidence.Confidence = diagnostics.High
 	} else if isCommonSecret(data) {
