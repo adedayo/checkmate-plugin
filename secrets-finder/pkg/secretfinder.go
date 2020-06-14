@@ -8,8 +8,8 @@ import (
 	"github.com/adedayo/checkmate-core/pkg/util"
 )
 
-//FindSecret locates secrets contained in a source that implements `io.Reader` interface using a `MatchProvider`
-func FindSecret(source io.Reader, matcher MatchProvider, shouldProvideSourceInDiagnostics bool) chan diagnostics.SecurityDiagnostic {
+//findSecret locates secrets contained in a source that implements `io.Reader` interface using a `MatchProvider`
+func findSecret(source io.Reader, matcher MatchProvider, shouldProvideSourceInDiagnostics bool) chan diagnostics.SecurityDiagnostic {
 	out := make(chan diagnostics.SecurityDiagnostic)
 	aggregator := common.MakeSimpleAggregator()
 	collector := func(diagnostic diagnostics.SecurityDiagnostic) {

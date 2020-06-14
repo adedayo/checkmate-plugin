@@ -23,14 +23,14 @@ var (
 func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.WhitelistProvider) (chan diagnostics.SecurityDiagnostic, chan []string) {
 	out := make(chan diagnostics.SecurityDiagnostic)
 	pathsOut := make(chan []string)
-	repos, local := determineAndCloneRepositories(paths)
+	repositories, local := determineAndCloneRepositories(paths)
 	paths = local
-	for _, path := range repos {
+	for _, path := range repositories {
 		paths = append(paths, path)
 	}
 	//reverse map local paths to git URLs
 	repoMapper := make(map[string]string)
-	for repo, loc := range repos {
+	for repo, loc := range repositories {
 		repoMapper[loc] = repo
 	}
 	collector := func(diagnostic diagnostics.SecurityDiagnostic) {
@@ -62,7 +62,7 @@ func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.Whitel
 		allFiles := []string{}
 		defer func() {
 			//clean downloaded repositories
-			for _, r := range repos {
+			for _, r := range repositories {
 				os.RemoveAll(r)
 			}
 			close(out)
@@ -141,7 +141,7 @@ func (pathBSF pathBasedSecretFinder) Consume(path string) {
 	ext := filepath.Ext(path)
 	if _, present := common.TextFileExtensions[ext]; present {
 		if f, err := os.Open(path); err == nil {
-			for issue := range FindSecret(f, GetFinderForFileType(ext), pathBSF.showSource) {
+			for issue := range findSecret(f, GetFinderForFileType(ext), pathBSF.showSource) {
 				issue.Location = &path
 				pathBSF.Broadcast(issue)
 			}
