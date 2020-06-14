@@ -96,7 +96,7 @@ func TestFindSecret(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for got := range findSecret(strings.NewReader(tt.value), GetFinderForFileType(tt.extension), false) {
+			for got := range FindSecret(strings.NewReader(tt.value), GetFinderForFileType(tt.extension), false) {
 				want := makeDiagnostic(tt.value, tt.evidences, tt.provider)
 				if !reflect.DeepEqual(got, want) {
 					g, _ := json.MarshalIndent(got, "", " ")

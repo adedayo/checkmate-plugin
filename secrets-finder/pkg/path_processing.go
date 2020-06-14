@@ -141,7 +141,7 @@ func (pathBSF pathBasedSecretFinder) Consume(path string) {
 	ext := filepath.Ext(path)
 	if _, present := common.TextFileExtensions[ext]; present {
 		if f, err := os.Open(path); err == nil {
-			for issue := range findSecret(f, GetFinderForFileType(ext), pathBSF.showSource) {
+			for issue := range FindSecret(f, GetFinderForFileType(ext), pathBSF.showSource) {
 				issue.Location = &path
 				pathBSF.Broadcast(issue)
 			}
