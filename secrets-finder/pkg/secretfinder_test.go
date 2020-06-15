@@ -26,9 +26,10 @@ func TestFindSecret(t *testing.T) {
 		evidences [3]diagnostics.Evidence
 	}{
 		{
-			name:     "Assignment 1",
-			value:    `pwd = "232d222x2324c2ecc2c2e"`,
-			provider: assignmentProviderID,
+			name:      "Assignment 1",
+			value:     `pwd = "232d222x2324c2ecc2c2e"`,
+			extension: ".java",
+			provider:  assignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
 				{
 					Description: descHardCodedSecretAssignment,
@@ -60,9 +61,10 @@ func TestFindSecret(t *testing.T) {
 			},
 		},
 		{
-			name:     "Assignment 3",
-			value:    `PassPhrase4 = "This should trigger a high"`,
-			provider: assignmentProviderID,
+			name:      "Assignment 3",
+			value:     `PassPhrase4 = "This should trigger a high"`,
+			extension: ".java",
+			provider:  assignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
 				{
 					Description: descHardCodedSecretAssignment,
@@ -94,11 +96,12 @@ func TestFindSecret(t *testing.T) {
 		},
 	}
 
+	wl := diagnostics.MakeEmptyWhitelists()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for got := range FindSecret(strings.NewReader(tt.value), GetFinderForFileType(tt.extension), false) {
+			for got := range FindSecret(strings.NewReader(tt.value), GetFinderForFileType(tt.extension, wl), false) {
 				want := makeDiagnostic(tt.value, tt.evidences, tt.provider)
-				if !reflect.DeepEqual(got, want) {
+				if !reflect.DeepEqual(got.Justification, want.Justification) {
 					g, _ := json.MarshalIndent(got, "", " ")
 					w, _ := json.MarshalIndent(want, "", " ")
 
@@ -119,5 +122,5 @@ func makeDiagnostic(source string, evidences [3]diagnostics.Evidence, providerID
 			Start: code.Position{Line: 0, Character: 0},
 			End:   code.Position{Line: 0, Character: len(source) - 1}},
 		Source:     nil,
-		ProviderID: providerID}
+		ProviderID: &providerID}
 }

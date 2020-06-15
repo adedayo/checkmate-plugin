@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	javaVar                 = `[a-zA-Z_$0-9]`
-	quote                   = `(?:["'` + "`])"
-	notQuote                = `(?:[^'"` + "`]*)"
+	javaVar  = `[a-zA-Z_$0-9]`
+	quote    = `(?:["'` + "`])"
+	notQuote = `(?:[^'"` + "`]*)"
+	//TODO cater for tripple quoted strings """ ... """ style
 	quotedString            = /** standard quote */ `(?s:"(?:[^"\\]|\\.)*")` /** tick */ + `|(?s:'(?:[^'\\]|\\.)*')` + /** backtick */ "|(?s:`(?:[^`\\\\]|\\\\.)*`)"
 	secretVarIndicator      = `(?i:secret|private|sensitive|confidential|c(?:y|i)pher|crypt|signature|nonce|credential|key|token|salt|auth(?:[^o]|o[^r])+|pass(?:[^e]|e[^ds])+(?:word|phrase)?|ps?wd)`
 	secretVar               = fmt.Sprintf(`(%s*?%s%s*?)`, javaVar, secretVarIndicator, javaVar)

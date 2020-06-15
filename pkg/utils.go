@@ -23,7 +23,7 @@ func ConvertSecurityDiagnostic(d *diagnostics.SecurityDiagnostic) *pb.SecurityDi
 	diagnostic := &pb.SecurityDiagnostic{
 		Justification: convertJustification(d.Justification),
 		Location:      *d.Location,
-		ProviderId:    d.ProviderID,
+		ProviderId:    *d.ProviderID,
 		Source:        *d.Source,
 		Range: &pb.Range{
 			Start: &pb.Position{

@@ -5,9 +5,11 @@ option go_package = ".;checkmate";
 message SecurityDiagnostic {
   Justification justification = 1;
   Range range = 2;
+  Range highlight_range = 7;
   string location = 3;
   string provider_id = 4;
   string source = 5;
+  bool whitelisted = 6;
 }
 
 message Range {
