@@ -346,7 +346,7 @@ func trimQuotes(text string) (string, int) {
 func balancedTrim(text string, quote byte) (string, int) {
 	trimmed := text
 	count := 0
-	if len(text) > 0 && text[0] == quote && text[len(text)-1] == quote {
+	if len(text) > 1 && text[0] == quote && text[len(text)-1] == quote {
 		trimmed = text[1 : len(text)-1]
 		count++
 	}
