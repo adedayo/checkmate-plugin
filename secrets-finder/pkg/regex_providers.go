@@ -42,53 +42,53 @@ var (
 )
 
 //GetFinderForFileType returns the appropriate MatchProvider based on the file type hint
-func GetFinderForFileType(fileType string, whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func GetFinderForFileType(fileType string, exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	switch strings.ToLower(fileType) {
 	case ".java", ".scala", ".kt", ".go":
-		return NewJavaFinder(whitelistProvider)
+		return NewJavaFinder(exclusionProvider)
 	case ".c", ".cpp", ".cc", ".c++", ".h++", ".hh", ".hpp":
-		return NewCPPSecretsFinders(whitelistProvider)
+		return NewCPPSecretsFinders(exclusionProvider)
 	case ".xml":
-		return NewXMLSecretsFinders(whitelistProvider)
+		return NewXMLSecretsFinders(exclusionProvider)
 	case ".json":
-		return NewJSONSecretsFinders(whitelistProvider)
+		return NewJSONSecretsFinders(exclusionProvider)
 	case ".yaml", ".yml":
-		return NewYamlSecretsFinders(whitelistProvider)
+		return NewYamlSecretsFinders(exclusionProvider)
 	case ".rb":
-		return NewRubySecretsFinders(whitelistProvider)
+		return NewRubySecretsFinders(exclusionProvider)
 	case ".erb":
-		return NewERubySecretsFinders(whitelistProvider)
+		return NewERubySecretsFinders(exclusionProvider)
 	case ".conf":
-		return NewConfigurationSecretsFinder(whitelistProvider)
+		return NewConfigurationSecretsFinder(exclusionProvider)
 	default:
-		return defaultFinder(whitelistProvider)
+		return defaultFinder(exclusionProvider)
 	}
 }
 
-func defaultFinder(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func defaultFinder(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(assignmentProviderID, secretAssignment, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(assignmentProviderID, secretAssignment, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewJavaFinder provides secret detection in Java-like programming languages
-func NewJavaFinder(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewJavaFinder(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(assignmentProviderID, secretAssignment, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(assignmentProviderID, secretAssignment, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //MatchProvider provides regular expressions and other facilities for locating secrets in source data
 type MatchProvider interface {
-	// common.WhitelistProvider
+	// common.exclusionProvider
 	GetFinders() []common.SourceToSecurityDiagnostics
 }
 
@@ -134,114 +134,114 @@ func (dmp defaultMatchProvider) GetFinders() []common.SourceToSecurityDiagnostic
 	return dmp.finders
 }
 
-func (dmp defaultMatchProvider) ShouldWhitelist(pathContext, value string) bool {
+func (dmp defaultMatchProvider) ShouldExclude(pathContext, value string) bool {
 	return false
 }
 
 //NewConfigurationSecretsFinder is a `MatchProvider` for finding secrets in configuration `.conf` files
-func NewConfigurationSecretsFinder(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewConfigurationSecretsFinder(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(confAssignmentProviderID, confAssignment, whitelistProvider),
-			makeAssignmentFinder(assignmentProviderID, secretAssignment, whitelistProvider),
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, whitelistProvider),
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(confAssignmentProviderID, confAssignment, exclusionProvider),
+			makeAssignmentFinder(assignmentProviderID, secretAssignment, exclusionProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, exclusionProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewCPPSecretsFinders is a `MatchProvider` for finding secrets in files with C++-like content
-func NewCPPSecretsFinders(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewCPPSecretsFinders(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(cppAssignmentProviderID, secretCPPAssignment, whitelistProvider),
-			makeAssignmentFinder(defineAssignmentProviderID, secretDefine, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(cppAssignmentProviderID, secretCPPAssignment, exclusionProvider),
+			makeAssignmentFinder(defineAssignmentProviderID, secretDefine, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewXMLSecretsFinders is a `MatchProvider` for finding secrets in files with XML content
-func NewXMLSecretsFinders(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewXMLSecretsFinders(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(tagAssignmentProviderID, secretTags, whitelistProvider),
-			makeAssignmentFinder(assignmentProviderID, secretAssignment, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(tagAssignmentProviderID, secretTags, exclusionProvider),
+			makeAssignmentFinder(assignmentProviderID, secretAssignment, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewJSONSecretsFinders is a `MatchProvider` for finding secrets in files with JSON content
-func NewJSONSecretsFinders(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewJSONSecretsFinders(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, whitelistProvider),
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, exclusionProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewRubySecretsFinders is a `MatchProvider` for finding secrets in files with Ruby content
-func NewRubySecretsFinders(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewRubySecretsFinders(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(tagAssignmentProviderID, secretTags, whitelistProvider),
-			makeAssignmentFinder(assignmentProviderID, secretAssignment, whitelistProvider),
-			makeAssignmentFinder(longTagValueProviderID, longTagValues, whitelistProvider),
-			makeAssignmentFinder(secretTagProviderID, secretTagValues, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(tagAssignmentProviderID, secretTags, exclusionProvider),
+			makeAssignmentFinder(assignmentProviderID, secretAssignment, exclusionProvider),
+			makeAssignmentFinder(longTagValueProviderID, longTagValues, exclusionProvider),
+			makeAssignmentFinder(secretTagProviderID, secretTagValues, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewERubySecretsFinders is a `MatchProvider` for finding secrets in files with ERuby content
-func NewERubySecretsFinders(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewERubySecretsFinders(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(tagAssignmentProviderID, secretTags, whitelistProvider),
-			makeAssignmentFinder(assignmentProviderID, secretAssignment, whitelistProvider),
-			makeAssignmentFinder(longTagValueProviderID, longTagValues, whitelistProvider),
-			makeAssignmentFinder(secretTagProviderID, secretTagValues, whitelistProvider),
-			makeSecretStringFinder(secretStringProviderID, secretStrings, whitelistProvider),
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, whitelistProvider),
-			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, whitelistProvider),
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(tagAssignmentProviderID, secretTags, exclusionProvider),
+			makeAssignmentFinder(assignmentProviderID, secretAssignment, exclusionProvider),
+			makeAssignmentFinder(longTagValueProviderID, longTagValues, exclusionProvider),
+			makeAssignmentFinder(secretTagProviderID, secretTagValues, exclusionProvider),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, exclusionProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, exclusionProvider),
+			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, exclusionProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
 //NewYamlSecretsFinders is a `MatchProvider` for finding secrets in files with YAML content
-func NewYamlSecretsFinders(whitelistProvider diagnostics.WhitelistProvider) MatchProvider {
+func NewYamlSecretsFinders(exclusionProvider diagnostics.ExclusionProvider) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.SourceToSecurityDiagnostics{
-			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, whitelistProvider),
-			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, whitelistProvider),
-			makeSecretStringFinder(longStringProviderID, longStrings, whitelistProvider),
+			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, exclusionProvider),
+			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, exclusionProvider),
+			makeSecretStringFinder(longStringProviderID, longStrings, exclusionProvider),
 		},
 	}
 }
 
-func makeAssignmentFinder(providerID string, re *regexp.Regexp, whitelistProvider diagnostics.WhitelistProvider) *assignmentFinder {
+func makeAssignmentFinder(providerID string, re *regexp.Regexp, exclusionProvider diagnostics.ExclusionProvider) *assignmentFinder {
 	sa := assignmentFinder{
-		secretFinder{WhitelistProvider: whitelistProvider},
+		secretFinder{ExclusionProvider: exclusionProvider},
 	}
 	sa.providerID = providerID
 	sa.res = []*regexp.Regexp{re}
 	return &sa
 }
 
-func makeSecretStringFinder(providerID string, re *regexp.Regexp, whitelistProvider diagnostics.WhitelistProvider) *secretStringFinder {
+func makeSecretStringFinder(providerID string, re *regexp.Regexp, exclusionProvider diagnostics.ExclusionProvider) *secretStringFinder {
 	sf := secretStringFinder{
 		secretFinder{
-			WhitelistProvider: whitelistProvider,
+			ExclusionProvider: exclusionProvider,
 		},
 	}
 	sf.providerID = providerID
@@ -252,7 +252,7 @@ func makeSecretStringFinder(providerID string, re *regexp.Regexp, whitelistProvi
 type secretFinder struct {
 	RegexFinder
 	diagnostics.DefaultSecurityDiagnosticsProvider
-	diagnostics.WhitelistProvider
+	diagnostics.ExclusionProvider
 }
 
 type assignmentFinder struct {
@@ -302,8 +302,8 @@ func (sa *assignmentFinder) Consume(startIndex int, source string) {
 						Start: sa.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsStart - 1),
 						End:   sa.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsEnd - 1),
 					},
-					ProviderID:  &sa.providerID,
-					Whitelisted: sa.ShouldWhitelistValue(assignedVal),
+					ProviderID: &sa.providerID,
+					Excluded:   sa.ShouldExcludeValue(assignedVal),
 				}
 				if diagnostic.Justification.Reasons[1].Confidence != diagnostics.Low {
 					diagnostic.Justification.Headline.Confidence = diagnostics.High
@@ -397,8 +397,8 @@ func (sf *secretStringFinder) Consume(startIndex int, source string) {
 						Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringStart - 1),
 						End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringEnd - 1),
 					},
-					ProviderID:  &sf.providerID,
-					Whitelisted: sf.ShouldWhitelistValue(value),
+					ProviderID: &sf.providerID,
+					Excluded:   sf.ShouldExcludeValue(value),
 				}
 				if diagnostic.Justification.Reasons[1].Confidence == diagnostics.High {
 					diagnostic.Justification.Headline.Confidence = diagnostics.High

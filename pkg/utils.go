@@ -5,9 +5,9 @@ import (
 	pb "github.com/adedayo/checkmate-plugin/proto"
 )
 
-//ConvertWhitelistDefinition goes from protobuf struct to model
-func ConvertWhitelistDefinition(wl *pb.WhitelistDefinition) *diagnostics.WhitelistDefinition {
-	wld := &diagnostics.WhitelistDefinition{
+//ConvertExcludeDefinition goes from protobuf struct to model
+func ConvertExcludeDefinition(wl *pb.ExcludeDefinition) *diagnostics.ExcludeDefinition {
+	wld := &diagnostics.ExcludeDefinition{
 		GloballyExcludedRegExs:  wl.GloballyExcludedRegExs,
 		GloballyExcludedStrings: wl.GloballyExcludedStrings,
 		PerFileExcludedStrings:  stringListMapConvert(wl.PerFileExcludedStrings),

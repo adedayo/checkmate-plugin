@@ -9,7 +9,7 @@ message SecurityDiagnostic {
   string location = 3;
   string provider_id = 4;
   string source = 5;
-  bool whitelisted = 6;
+  bool excluded = 6;
 }
 
 message Range {

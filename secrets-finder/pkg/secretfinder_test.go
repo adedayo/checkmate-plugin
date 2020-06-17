@@ -96,7 +96,7 @@ func TestFindSecret(t *testing.T) {
 		},
 	}
 
-	wl := diagnostics.MakeEmptyWhitelists()
+	wl := diagnostics.MakeEmptyExclusions()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for got := range FindSecret(strings.NewReader(tt.value), GetFinderForFileType(tt.extension, wl), false) {

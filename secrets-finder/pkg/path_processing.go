@@ -21,7 +21,7 @@ var (
 
 //SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
 //Streams back security diagnostics and paths
-func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.WhitelistProvider) (chan diagnostics.SecurityDiagnostic, chan []string) {
+func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.ExclusionProvider) (chan diagnostics.SecurityDiagnostic, chan []string) {
 	out := make(chan diagnostics.SecurityDiagnostic)
 	pathsOut := make(chan []string)
 	repositories, local := determineAndCloneRepositories(paths)
@@ -47,11 +47,11 @@ func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.Whitel
 	}
 	consumers := []util.PathConsumer{
 		&confidentialFilesFinder{
-			WhitelistProvider: wl,
+			ExclusionProvider: wl,
 		},
 		&pathBasedSecretFinder{
 			showSource:        showSource,
-			WhitelistProvider: wl,
+			ExclusionProvider: wl,
 		},
 	}
 	providers := []diagnostics.SecurityDiagnosticsProvider{}
@@ -103,14 +103,14 @@ func determineAndCloneRepositories(paths []string) (map[string]string, []string)
 
 type confidentialFilesFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
-	diagnostics.WhitelistProvider
-	verbose bool //if set, generate diagnostics for whitelisted files/paths
+	diagnostics.ExclusionProvider
+	verbose bool //if set, generate diagnostics for excluded files/paths
 }
 
 func (cff confidentialFilesFinder) Consume(path string) {
-	if cff.ShouldWhitelistPath(path) {
+	if cff.ShouldExcludePath(path) {
 		if cff.verbose {
-			why := fmt.Sprintf("Skipped: A whitelist matches path %s", path)
+			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
 			issue := diagnostics.SecurityDiagnostic{
 				Location:   &path,
 				ProviderID: &confidentialFilesProviderID,
@@ -120,7 +120,7 @@ func (cff confidentialFilesFinder) Consume(path string) {
 						Confidence:  diagnostics.High,
 					},
 				},
-				Whitelisted: true,
+				Excluded: true,
 			}
 			cff.Broadcast(issue)
 		}
@@ -150,15 +150,15 @@ func (cff confidentialFilesFinder) Consume(path string) {
 
 type pathBasedSecretFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
-	diagnostics.WhitelistProvider
+	diagnostics.ExclusionProvider
 	showSource bool
-	verbose    bool //if set, generate diagnostics for whitelisted files/paths and values
+	verbose    bool //if set, generate diagnostics for excluded files/paths and values
 }
 
 func (pathBSF pathBasedSecretFinder) Consume(path string) {
-	if pathBSF.ShouldWhitelistPath(path) {
+	if pathBSF.ShouldExcludePath(path) {
 		if pathBSF.verbose {
-			why := fmt.Sprintf("Skipped: A whitelist matches path %s", path)
+			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
 			issue := diagnostics.SecurityDiagnostic{
 				Location:   &path,
 				ProviderID: &pathBasedSecretFinderProviderID,
@@ -168,7 +168,7 @@ func (pathBSF pathBasedSecretFinder) Consume(path string) {
 						Confidence:  diagnostics.High,
 					},
 				},
-				Whitelisted: true,
+				Excluded: true,
 			}
 			pathBSF.Broadcast(issue)
 		}
@@ -177,7 +177,7 @@ func (pathBSF pathBasedSecretFinder) Consume(path string) {
 	ext := filepath.Ext(path)
 	if _, present := common.TextFileExtensions[ext]; present {
 		if f, err := os.Open(path); err == nil {
-			for issue := range FindSecret(f, GetFinderForFileType(ext, pathBSF.WhitelistProvider), pathBSF.showSource) {
+			for issue := range FindSecret(f, GetFinderForFileType(ext, pathBSF.ExclusionProvider), pathBSF.showSource) {
 				issue.Location = &path
 				pathBSF.Broadcast(issue)
 			}

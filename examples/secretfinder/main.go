@@ -28,7 +28,7 @@ func main() {
 		ScanType:    pb.ScanType_PATH_SCAN,
 		PathsToScan: []string{"."},
 		ShowSource:  true,
-		Whitelists:  &pb.WhitelistDefinition{},
+		Exclusions:  &pb.ExcludeDefinition{},
 	})
 	if err != nil {
 		fmt.Println("Error:", err.Error())

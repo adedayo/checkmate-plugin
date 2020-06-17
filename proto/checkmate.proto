@@ -29,8 +29,8 @@ message DataToScan {
 
 message StringList { repeated string value = 1; }
 
-// WhitelistDefinition is the structure for conveying whitelist definitions
-message WhitelistDefinition {
+// ExcludeDefinition is the structure for conveying excluded values definitions
+message ExcludeDefinition {
   repeated string globally_excluded_reg_exs = 1;
   repeated string globally_excluded_strings = 2;
   repeated string path_exclusion_reg_exs = 3;
@@ -44,8 +44,8 @@ message ScanRequest {
   repeated string paths_to_scan = 2;
   // used for STRING_SCAN request type
   repeated DataToScan data_to_scan = 3;
-  // whitelists
-  WhitelistDefinition whitelists = 4;
+  // excludes
+  ExcludeDefinition excludes = 4;
   // show source code evidence where possible
   bool show_source = 5;
 }
