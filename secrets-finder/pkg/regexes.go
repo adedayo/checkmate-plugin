@@ -12,8 +12,9 @@ var (
 	notQuote = `(?:[^'"` + "`]*)"
 	//TODO cater for tripple quoted strings """ ... """ style
 	quotedString            = /** standard quote */ `(?s:"(?:[^"\\]|\\.)*")` /** tick */ + `|(?s:'(?:[^'\\]|\\.)*')` + /** backtick */ "|(?s:`(?:[^`\\\\]|\\\\.)*`)"
-	secretVarIndicator      = `(?i:secret|private|sensitive|confidential|c(?:y|i)pher|crypt|signature|nonce|credential|key|token|salt|auth(?:[^o]|o[^r])+|pass(?:[^e]|e[^ds])+(?:word|phrase)?|ps?wd)`
+	secretVarIndicator      = `(?i:secret|private|sensitive|confidential|c(?:y|i)pher|crypt|signature|nonce|credential|cert|key|token|salt|auth(?:[^o]|o[^r])+|pass(?:[^e]|e[^ds])+(?:word|phrase)?|ps?wd)`
 	secretVar               = fmt.Sprintf(`(%s*?%s%s*?)`, javaVar, secretVarIndicator, javaVar)
+	secretVarCompile        = regexp.MustCompile(secretVar)
 	secretAssignment        = regexp.MustCompile(fmt.Sprintf(`%s\s*(?::[^=]+)?\s*[+]?!?==?\s*(%s)`, secretVar, quotedString))
 	confAssignment          = regexp.MustCompile(fmt.Sprintf(`%s\s*[+]?!?=?\s*(%s)`, secretVar, quotedString))
 	secretCPPAssignment     = regexp.MustCompile(fmt.Sprintf(`%s\s*[+]?!?==?\s*L?(%s)`, secretVar, quotedString))
@@ -27,7 +28,7 @@ var (
 		`[a-z0-9+/]{0,8}[0-9][a-z0-9+/]{8,}={1,2}`, //Base64-like string
 		`[0-9a-fA-F]{16,}`,                         //Hex-like string
 	}
-	commonSecretPatterns = []string{`password\d?`, `change(?:it|me)`, `postgres`, `admin`, `qwerty`, `1234567?8?`, `111111`}
+	commonSecretPatterns = []string{`password\d?`, `change(?:it|me)`, `postgres`, `admin`, `root`, `qwerty`, `1234567?8?`, `111111`}
 	commonSecrets        = []*regexp.Regexp{}
 	encodedSecrets       = []*regexp.Regexp{}
 	upperCase            = regexp.MustCompile(`[A-Z]`)

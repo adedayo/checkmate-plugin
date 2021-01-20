@@ -96,10 +96,11 @@ func TestFindSecret(t *testing.T) {
 		},
 	}
 
-	wl := diagnostics.MakeEmptyExclusions()
+	wl := diagnostics.MakeEmptyExcludes()
+	path := "" // dummy path
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for got := range FindSecret(strings.NewReader(tt.value), GetFinderForFileType(tt.extension, wl), false) {
+			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, wl), false) {
 				want := makeDiagnostic(tt.value, tt.evidences, tt.provider)
 				if !reflect.DeepEqual(got.Justification, want.Justification) {
 					g, _ := json.MarshalIndent(got, "", " ")
@@ -120,7 +121,7 @@ func makeDiagnostic(source string, evidences [3]diagnostics.Evidence, providerID
 		},
 		Range: code.Range{
 			Start: code.Position{Line: 0, Character: 0},
-			End:   code.Position{Line: 0, Character: len(source) - 1}},
+			End:   code.Position{Line: 0, Character: int64(len(source) - 1)}},
 		Source:     nil,
 		ProviderID: &providerID}
 }

@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -99,4 +100,33 @@ func getShannonEntropy(data string) float64 {
 		return -entropy
 	}
 	return entropy
+}
+
+type stack struct {
+	data []string
+}
+
+func (s *stack) push(x string) {
+	s.data = append(s.data, x)
+}
+
+func (s *stack) pop() (out string, err error) {
+	if len(s.data) == 0 {
+		return "", fmt.Errorf("Popping an empty stack")
+	}
+	index := len(s.data) - 1
+	out = s.data[index]
+	s.data = s.data[0:index]
+
+	return out, nil
+}
+
+func (s *stack) peek() (out string, err error) {
+	if len(s.data) == 0 {
+		return "", fmt.Errorf("Peeking an empty stack")
+	}
+	index := len(s.data) - 1
+	out = s.data[index]
+
+	return out, nil
 }

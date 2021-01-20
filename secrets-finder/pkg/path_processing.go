@@ -21,7 +21,7 @@ var (
 
 //SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
 //Streams back security diagnostics and paths
-func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.ExclusionProvider) (chan diagnostics.SecurityDiagnostic, chan []string) {
+func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan diagnostics.SecurityDiagnostic, chan []string) {
 	out := make(chan diagnostics.SecurityDiagnostic)
 	pathsOut := make(chan []string)
 	repositories, local := determineAndCloneRepositories(paths)
@@ -45,14 +45,25 @@ func SearchSecretsOnPaths(paths []string, showSource bool, wl diagnostics.Exclus
 		}
 		out <- diagnostic
 	}
-	consumers := []util.PathConsumer{
-		&confidentialFilesFinder{
-			ExclusionProvider: wl,
-		},
-		&pathBasedSecretFinder{
-			showSource:        showSource,
-			ExclusionProvider: wl,
-		},
+
+	var consumers []util.PathConsumer
+	if options.ConfidentialFilesOnly {
+		consumers = []util.PathConsumer{
+			&confidentialFilesFinder{
+				ExclusionProvider: options.Exclusions,
+			},
+		}
+	} else {
+		consumers = []util.PathConsumer{
+			&confidentialFilesFinder{
+				ExclusionProvider: options.Exclusions,
+			},
+			&pathBasedSourceSecretFinder{
+				showSource:        options.ShowSource,
+				ExclusionProvider: options.Exclusions,
+			},
+		}
+
 	}
 	providers := []diagnostics.SecurityDiagnosticsProvider{}
 	for _, c := range consumers {
@@ -107,7 +118,7 @@ type confidentialFilesFinder struct {
 	verbose bool //if set, generate diagnostics for excluded files/paths
 }
 
-func (cff confidentialFilesFinder) Consume(path string) {
+func (cff confidentialFilesFinder) ConsumePath(path string) {
 	if cff.ShouldExcludePath(path) {
 		if cff.verbose {
 			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
@@ -148,14 +159,14 @@ func (cff confidentialFilesFinder) Consume(path string) {
 	}
 }
 
-type pathBasedSecretFinder struct {
+type pathBasedSourceSecretFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
 	diagnostics.ExclusionProvider
 	showSource bool
 	verbose    bool //if set, generate diagnostics for excluded files/paths and values
 }
 
-func (pathBSF pathBasedSecretFinder) Consume(path string) {
+func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 	if pathBSF.ShouldExcludePath(path) {
 		if pathBSF.verbose {
 			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
@@ -177,7 +188,7 @@ func (pathBSF pathBasedSecretFinder) Consume(path string) {
 	ext := filepath.Ext(path)
 	if _, present := common.TextFileExtensions[ext]; present {
 		if f, err := os.Open(path); err == nil {
-			for issue := range FindSecret(f, GetFinderForFileType(ext, pathBSF.ExclusionProvider), pathBSF.showSource) {
+			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.ExclusionProvider), pathBSF.showSource) {
 				issue.Location = &path
 				pathBSF.Broadcast(issue)
 			}

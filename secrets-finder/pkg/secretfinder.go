@@ -9,7 +9,7 @@ import (
 )
 
 //FindSecret locates secrets contained in a source that implements `io.Reader` interface using a `MatchProvider`
-func FindSecret(source io.Reader, matcher MatchProvider, shouldProvideSourceInDiagnostics bool) chan diagnostics.SecurityDiagnostic {
+func FindSecret(filePath string, source io.Reader, matcher MatchProvider, shouldProvideSourceInDiagnostics bool) chan diagnostics.SecurityDiagnostic {
 	out := make(chan diagnostics.SecurityDiagnostic)
 	aggregator := common.MakeSimpleAggregator()
 	collector := func(diagnostic diagnostics.SecurityDiagnostic) {
@@ -30,11 +30,11 @@ func FindSecret(source io.Reader, matcher MatchProvider, shouldProvideSourceInDi
 			providers = append(providers, c.(diagnostics.SecurityDiagnosticsProvider))
 		}
 		common.RegisterDiagnosticsConsumer(collector, providers...)
-		sourceConsumers := []util.SourceConsumer{}
+		sourceConsumers := []util.ResourceConsumer{}
 		for _, c := range consumers {
-			sourceConsumers = append(sourceConsumers, c.(util.SourceConsumer))
+			sourceConsumers = append(sourceConsumers, c.(util.ResourceConsumer))
 		}
-		util.NewSourceMultiplexer(&source, shouldProvideSourceInDiagnostics, sourceConsumers...)
+		util.NewResourceMultiplexer(filePath, &source, shouldProvideSourceInDiagnostics, sourceConsumers...)
 	}()
 	return out
 }
