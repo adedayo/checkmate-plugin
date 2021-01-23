@@ -51,16 +51,19 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan dia
 		consumers = []util.PathConsumer{
 			&confidentialFilesFinder{
 				ExclusionProvider: options.Exclusions,
+				options:           options,
 			},
 		}
 	} else {
 		consumers = []util.PathConsumer{
 			&confidentialFilesFinder{
 				ExclusionProvider: options.Exclusions,
+				options:           options,
 			},
 			&pathBasedSourceSecretFinder{
 				showSource:        options.ShowSource,
 				ExclusionProvider: options.Exclusions,
+				options:           options,
 			},
 		}
 
@@ -116,6 +119,7 @@ type confidentialFilesFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
 	diagnostics.ExclusionProvider
 	verbose bool //if set, generate diagnostics for excluded files/paths
+	options SecretSearchOptions
 }
 
 func (cff confidentialFilesFinder) ConsumePath(path string) {
@@ -132,6 +136,7 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 					},
 				},
 				Excluded: true,
+				SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
 			}
 			cff.Broadcast(issue)
 		}
@@ -142,6 +147,7 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 		issue := diagnostics.SecurityDiagnostic{
 			Location:   &path,
 			ProviderID: &confidentialFilesProviderID,
+			SHA256:     computeFileHash(cff.options.CalculateChecksum, path),
 			Justification: diagnostics.Justification{
 				Headline: diagnostics.Evidence{
 					Description: why,
@@ -164,6 +170,7 @@ type pathBasedSourceSecretFinder struct {
 	diagnostics.ExclusionProvider
 	showSource bool
 	verbose    bool //if set, generate diagnostics for excluded files/paths and values
+	options    SecretSearchOptions
 }
 
 func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
@@ -188,7 +195,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 	ext := filepath.Ext(path)
 	if _, present := common.TextFileExtensions[ext]; present {
 		if f, err := os.Open(path); err == nil {
-			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.ExclusionProvider), pathBSF.showSource) {
+			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.options), pathBSF.options.ShowSource) {
 				issue.Location = &path
 				pathBSF.Broadcast(issue)
 			}

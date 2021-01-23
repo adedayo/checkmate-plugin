@@ -48,6 +48,8 @@ message ScanRequest {
   ExcludeDefinition excludes = 4;
   // show source code evidence where possible
   bool show_source = 5;
+  bool confidential_files_only = 6;
+  bool calculate_checksum = 7;
 }
 
 service PluginService {

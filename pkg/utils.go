@@ -27,12 +27,12 @@ func ConvertSecurityDiagnostic(d *diagnostics.SecurityDiagnostic) *pb.SecurityDi
 		Source:        *d.Source,
 		Range: &pb.Range{
 			Start: &pb.Position{
-				Line:      int32(d.Range.Start.Line),
-				Character: int32(d.Range.Start.Character),
+				Line:      d.Range.Start.Line,
+				Character: d.Range.Start.Character,
 			},
 			End: &pb.Position{
-				Line:      int32(d.Range.End.Line),
-				Character: int32(d.Range.End.Character),
+				Line:      d.Range.End.Line,
+				Character: d.Range.End.Character,
 			},
 		},
 	}

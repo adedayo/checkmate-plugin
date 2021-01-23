@@ -35,8 +35,10 @@ func (sfp *FinderPlugin) Scan(req *pb.ScanRequest, stream pb.PluginService_ScanS
 		return err
 	}
 	diags, paths := SearchSecretsOnPaths(req.PathsToScan, SecretSearchOptions{
-		ShowSource: req.ShowSource,
-		Exclusions: wl,
+		ShowSource:            req.ShowSource,
+		Exclusions:            wl,
+		ConfidentialFilesOnly: req.ConfidentialFilesOnly,
+		CalculateChecksum:     req.CalculateChecksum,
 	})
 	for diagnostic := range diags {
 		if err := stream.Send(model.ConvertSecurityDiagnostic(&diagnostic)); err != nil {

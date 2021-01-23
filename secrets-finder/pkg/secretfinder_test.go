@@ -98,9 +98,12 @@ func TestFindSecret(t *testing.T) {
 
 	wl := diagnostics.MakeEmptyExcludes()
 	path := "" // dummy path
+	options := SecretSearchOptions{
+		Exclusions: wl,
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, wl), false) {
+			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, options), false) {
 				want := makeDiagnostic(tt.value, tt.evidences, tt.provider)
 				if !reflect.DeepEqual(got.Justification, want.Justification) {
 					g, _ := json.MarshalIndent(got, "", " ")

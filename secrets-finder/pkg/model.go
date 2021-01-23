@@ -7,4 +7,5 @@ type SecretSearchOptions struct {
 	ShowSource            bool
 	Exclusions            diagnostics.ExclusionProvider
 	ConfidentialFilesOnly bool
+	CalculateChecksum     bool
 }
