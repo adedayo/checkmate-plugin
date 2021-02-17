@@ -36,6 +36,7 @@ var (
 	confAssignmentProviderID      = "ConfSecretAssignment"
 	cppAssignmentProviderID       = "CPPSecretAssignment"
 	longTagValueProviderID        = "LongOrSuspiciousSecretInXML"
+	xmlAssignmentProviderID       = "SecretAssignmentInXML"
 	secretTagProviderID           = "SuspiciousOrCommonSecretInXML"
 	jsonAssignmentProviderID      = "JSONSecretAssignment"
 	yamlAssignmentProviderID      = "YAMLSecretAssignment"
@@ -181,12 +182,15 @@ type idRegexPair struct {
 func NewXMLSecretsFinders(filePath string, options SecretSearchOptions) MatchProvider {
 	return &defaultMatchProvider{
 		finders: []common.ResourceToSecurityDiagnostics{
-			makeXMLSecretsFinder(filePath, options, []idRegexPair{
+			makeXMLSecretsFinder(filePath, []idRegexPair{
+				{xmlAssignmentProviderID, secretAssignment},
+				{xmlAssignmentProviderID, yamlAssignment},
+				{xmlAssignmentProviderID, arrowAssignment},
 				{secretTagProviderID, secretUnquotedText},
 				{longTagValueProviderID, longUnquotedText},
 				{secretStringProviderID, secretStrings},
 				{longStringProviderID, longStrings},
-			}),
+			}, options),
 		},
 	}
 }
@@ -244,7 +248,7 @@ func NewYamlSecretsFinders(options SecretSearchOptions) MatchProvider {
 	}
 }
 
-func makeXMLSecretsFinder(filePath string, options SecretSearchOptions, stringRegexes []idRegexPair) *xmlSecretFinder {
+func makeXMLSecretsFinder(filePath string, stringRegexes []idRegexPair, options SecretSearchOptions) *xmlSecretFinder {
 	sxml := xmlSecretFinder{
 		secretFinder{
 			ExclusionProvider: options.Exclusions,
@@ -327,64 +331,10 @@ func (sa *assignmentFinder) Consume(startIndex int64, source string) {
 		matches := re.FindAllStringSubmatchIndex(source, -1)
 		for _, match := range matches {
 			if len(match) == 6 { //we are expecting 6 elements
-				start := int64(match[0])
-				end := int64(match[1])
-
-				rhsStart := int64(match[4]) //beginning of assigned value
-				assignedVal := source[rhsStart:end]
-				assignedVal, count := trimQuotes(assignedVal)
-				rhsStart += int64(count)
-				rhsEnd := rhsStart + int64(len(assignedVal))
-				evidence := detectSecret(assignedVal)
-				variable := strings.ToLower(source[match[2]:match[3]])
-				if strings.Contains(variable, "passphrase") {
-					//special "passphrase" case:
-					//if the assigned variable is a passphrase bypass any result of the assigned value
-					evidence.Description = descHardCodedSecret
-					evidence.Confidence = diagnostics.High
-				}
-
-				diagnostic := diagnostics.SecurityDiagnostic{
-					Justification: diagnostics.Justification{
-						Headline: diagnostics.Evidence{
-							Description: descHardCodedSecretAssignment,
-							Confidence:  diagnostics.Medium,
-						},
-						Reasons: []diagnostics.Evidence{
-							{
-								Description: descVarSecret,
-								Confidence:  diagnostics.High,
-							},
-							evidence},
-					},
-					Range: code.Range{
-						Start: sa.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
-						End:   sa.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
-					},
-					HighlightRange: code.Range{
-						Start: sa.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsStart - 1),
-						End:   sa.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsEnd - 1),
-					},
-					ProviderID: &sa.providerID,
-					Excluded:   sa.ShouldExcludeValue(assignedVal),
-					SHA256:     computeHash(sa.options.CalculateChecksum, assignedVal),
-				}
-				if diagnostic.Justification.Reasons[1].Confidence != diagnostics.Low {
-					diagnostic.Justification.Headline.Confidence = diagnostics.High
-				}
-				if diagnostic.Justification.Reasons[1].Description == descNotSecret &&
-					diagnostic.Justification.Headline.Confidence > diagnostics.Medium {
-					diagnostic.Justification.Headline.Confidence = diagnostics.Medium
-				}
-				if sa.provideSource {
-					s := source[start:end]
-					diagnostic.Source = &s
-				}
-				sa.Broadcast(diagnostic)
+				processAssignment(match, sa.providerID, source, startIndex, sa.secretFinder)
 			}
 		}
 	}
-
 }
 
 func (sa *assignmentFinder) ConsumePath(path string) {
@@ -433,48 +383,7 @@ func (sf *secretStringFinder) Consume(startIndex int64, source string) {
 		matches := re.FindAllStringSubmatchIndex(source, -1)
 		for _, match := range matches {
 			if len(match) == 4 && space.FindAllStringIndex(source[match[0]:match[1]], -1) == nil {
-				start := int64(match[0])
-				end := int64(match[1])
-
-				value := source[start:end]
-				value, count := trimQuotes(value)
-				stringStart := start + int64(count)
-				stringEnd := stringStart + int64(len(value))
-
-				evidence := detectSecret(value)
-				diagnostic := diagnostics.SecurityDiagnostic{
-					Justification: diagnostics.Justification{
-						Headline: diagnostics.Evidence{
-							Description: descSecretUnbrokenString,
-							Confidence:  diagnostics.Medium,
-						},
-						Reasons: []diagnostics.Evidence{
-							{
-								Description: descSecretUnbrokenString,
-								Confidence:  diagnostics.Medium,
-							},
-							evidence},
-					},
-					Range: code.Range{
-						Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
-						End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
-					},
-					HighlightRange: code.Range{
-						Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringStart - 1),
-						End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringEnd - 1),
-					},
-					ProviderID: &sf.providerID,
-					Excluded:   sf.ShouldExcludeValue(value),
-					SHA256:     computeHash(sf.options.CalculateChecksum, value),
-				}
-				if diagnostic.Justification.Reasons[1].Confidence == diagnostics.High {
-					diagnostic.Justification.Headline.Confidence = diagnostics.High
-				}
-				if sf.provideSource {
-					s := source[start:end]
-					diagnostic.Source = &s
-				}
-				sf.Broadcast(diagnostic)
+				processString(match, sf.providerID, source, startIndex, sf.secretFinder)
 			}
 		}
 	}
@@ -526,8 +435,25 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 		switch se := t.(type) {
 		case xml.StartElement:
 			stack.push(se.Name.Local)
+			var elementOffSet int64
+			var attributes string
+			if len(se.Attr) > 0 {
+				elementOffSet = findElementOffset(scan, decoder.InputOffset(), se.Name.Local)
+				buffSize := int(decoder.InputOffset() - elementOffSet)
+				buff := make([]byte, buffSize)
+				scan.Seek(elementOffSet, io.SeekStart)
+				_, err := scan.Read(buff)
+				if err != nil {
+					log.Printf("Error %s\n", err.Error())
+				}
+				attributes = string(buff)
+			}
 			for _, attr := range se.Attr {
-				processXMLAssignment(attr.Name.Local, attr.Value, decoder.InputOffset(), false, xf)
+				offset := decoder.InputOffset()
+				if index := strings.Index(attributes, attr.Name.Local); index != -1 {
+					offset = elementOffSet + int64(index)
+				}
+				processXMLAssignment(attr.Name.Local, attr.Value, offset, false, xf)
 			}
 		case xml.CharData: //CDATA <![CDATA[ some CDATA content ]]>
 			//- decoder also sends raw element values e.g. <el>element value</el> as CharData
@@ -539,13 +465,15 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 			if !isChar {
 				//deal with element value
 				if el, e := stack.peek(); e == nil {
-					processXMLAssignment(el, cdata, decoder.InputOffset(), true, xf)
+					processXMLAssignment(el, cdata, decoder.InputOffset()-int64(len(cdata)), true, xf)
 				}
 			} else {
-				processXMLStrings(cdata, decoder.InputOffset(), xf)
+				//proper CDATA
+				processXMLStrings(cdata, decoder.InputOffset()-int64(len(cdata)+3 /**the 3 ]]> chars */), xf)
 			}
 		case xml.Comment: // <!-- comments in xml -->
-			processXMLStrings(string(se), decoder.InputOffset(), xf)
+			comment := string(se)
+			processXMLStrings(comment, decoder.InputOffset()-int64(len(comment)+3 /**the 3 --> chars */), xf)
 		case xml.EndElement:
 			if x, e := stack.pop(); e != nil || se.Name.Local != x {
 				log.Printf("%s, got tag %s, expecting %s", e.Error(), x, se.Name.Local)
@@ -555,6 +483,32 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 	}
 }
 
+//try and locate the offset of the <element  (the position of the letter t in <element )
+//this may fail, in which case we will just simply return the original offset passed to the function
+func findElementOffset(file io.ReadSeeker, offset int64, element string) int64 {
+	length := 2 * len(element) // we are going to search backwards reading twice (arbitrary) the length of the attribute
+	maxReverseDistance := 1024 // beyond which we will give up
+	stopString := fmt.Sprintf("<%s", element)
+	for traversed := length; traversed <= maxReverseDistance; traversed += length {
+		buff := make([]byte, traversed)
+		start := offset - int64(traversed)
+		if _, err := file.Seek(start, io.SeekStart); err == nil {
+			_, err = file.Read(buff)
+			if err != nil {
+				break
+			}
+			if index := strings.Index(string(buff), stopString); index != -1 {
+				// found the beginning
+				return start + int64(index+len(stopString))
+			}
+		} else {
+			break
+		}
+	}
+
+	return offset
+}
+
 func processXMLStrings(data string, sourceIndex int64, finder *xmlSecretFinder) {
 	for i, re := range finder.res {
 		providerID := finder.regexIDs[i]
@@ -562,55 +516,123 @@ func processXMLStrings(data string, sourceIndex int64, finder *xmlSecretFinder) 
 	}
 }
 
+func processAssignment(match []int, providerID, source string, startIndex int64, sf secretFinder) {
+	if len(match) == 6 { //we are expecting 6 elements
+		start := int64(match[0])
+		end := int64(match[1])
+
+		rhsStart := int64(match[4]) //beginning of assigned value
+		assignedVal := source[rhsStart:end]
+		assignedVal, count := trimQuotes(assignedVal)
+		rhsStart += int64(count)
+		rhsEnd := rhsStart + int64(len(assignedVal))
+		evidence := detectSecret(assignedVal)
+		variable := strings.ToLower(source[match[2]:match[3]])
+		if strings.Contains(variable, "passphrase") {
+			//special "passphrase" case:
+			//if the assigned variable is a passphrase bypass any result of the assigned value
+			evidence.Description = descHardCodedSecret
+			evidence.Confidence = diagnostics.High
+		}
+
+		diagnostic := diagnostics.SecurityDiagnostic{
+			Justification: diagnostics.Justification{
+				Headline: diagnostics.Evidence{
+					Description: descHardCodedSecretAssignment,
+					Confidence:  diagnostics.Medium,
+				},
+				Reasons: []diagnostics.Evidence{
+					{
+						Description: descVarSecret,
+						Confidence:  diagnostics.High,
+					},
+					evidence},
+			},
+			Range: code.Range{
+				Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
+				End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
+			},
+			HighlightRange: code.Range{
+				Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsStart - 1),
+				End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsEnd - 1),
+			},
+			ProviderID: &providerID,
+			Excluded:   sf.ShouldExcludeValue(assignedVal),
+			SHA256:     computeHash(sf.options.CalculateChecksum, assignedVal),
+		}
+		if diagnostic.Justification.Reasons[1].Confidence != diagnostics.Low {
+			diagnostic.Justification.Headline.Confidence = diagnostics.High
+		}
+		if diagnostic.Justification.Reasons[1].Description == descNotSecret &&
+			diagnostic.Justification.Headline.Confidence > diagnostics.Medium {
+			diagnostic.Justification.Headline.Confidence = diagnostics.Medium
+		}
+		if sf.provideSource {
+			s := source[start:end]
+			diagnostic.Source = &s
+		}
+		sf.Broadcast(diagnostic)
+	}
+}
+
+func processString(match []int, providerID, source string, startIndex int64, sf secretFinder) {
+	start := int64(match[0])
+	end := int64(match[1])
+	value := source[start:end]
+	value, count := trimQuotes(value)
+	stringStart := start + int64(count)
+	stringEnd := stringStart + int64(len(value))
+
+	evidence := detectSecret(value)
+	if evidence.Description == descNotSecret && evidence.Confidence == diagnostics.High {
+		return //skip high confidence non-secrets
+	}
+
+	diagnostic := diagnostics.SecurityDiagnostic{
+		Justification: diagnostics.Justification{
+			Headline: diagnostics.Evidence{
+				Description: descSecretUnbrokenString,
+				Confidence:  diagnostics.Medium,
+			},
+			Reasons: []diagnostics.Evidence{
+				{
+					Description: descSecretUnbrokenString,
+					Confidence:  diagnostics.Medium,
+				},
+				evidence},
+		},
+		Range: code.Range{
+			Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
+			End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
+		},
+		HighlightRange: code.Range{
+			Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringStart - 1),
+			End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringEnd - 1),
+		},
+		ProviderID: &providerID,
+		Excluded:   sf.ShouldExcludeValue(value),
+		SHA256:     computeHash(sf.options.CalculateChecksum, value),
+	}
+	if diagnostic.Justification.Reasons[1].Confidence == diagnostics.High {
+		diagnostic.Justification.Headline.Confidence = diagnostics.High
+	}
+	if sf.provideSource {
+		s := source[start:end]
+		diagnostic.Source = &s
+	}
+	sf.Broadcast(diagnostic)
+}
+
 func findXMLStringSecret(source string, startIndex int64, providerID string, re *regexp.Regexp, sf *xmlSecretFinder) {
 	if strings.TrimSpace(source) == "" {
 		return
 	}
 	matches := re.FindAllStringSubmatchIndex(source, -1)
-	// fmt.Printf("Matches %#v, %d, %s, `%s`\n", matches, startIndex, providerID, source)
 	for _, match := range matches {
-		if len(match) == 4 && space.FindAllStringIndex(source[match[0]:match[1]], -1) == nil {
-			start := int64(match[0])
-			end := int64(match[1])
-			value := source[start:end]
-			value, count := trimQuotes(value)
-			stringStart := start + int64(count)
-			stringEnd := stringStart + int64(len(value))
-
-			evidence := detectSecret(value)
-			diagnostic := diagnostics.SecurityDiagnostic{
-				Justification: diagnostics.Justification{
-					Headline: diagnostics.Evidence{
-						Description: descSecretUnbrokenString,
-						Confidence:  diagnostics.Medium,
-					},
-					Reasons: []diagnostics.Evidence{
-						{
-							Description: descSecretUnbrokenString,
-							Confidence:  diagnostics.Medium,
-						},
-						evidence},
-				},
-				Range: code.Range{
-					Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
-					End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
-				},
-				HighlightRange: code.Range{
-					Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringStart - 1),
-					End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringEnd - 1),
-				},
-				ProviderID: &providerID,
-				Excluded:   sf.ShouldExcludeValue(value),
-				SHA256:     computeHash(sf.options.CalculateChecksum, value),
-			}
-			if diagnostic.Justification.Reasons[1].Confidence == diagnostics.High {
-				diagnostic.Justification.Headline.Confidence = diagnostics.High
-			}
-			if sf.provideSource {
-				s := source[start:end]
-				diagnostic.Source = &s
-			}
-			sf.Broadcast(diagnostic)
+		if len(match) == 6 { //assignment match signature
+			processAssignment(match, providerID, source, startIndex, sf.secretFinder)
+		} else if len(match) == 4 && space.FindAllStringIndex(source[match[0]:match[1]], -1) == nil {
+			processString(match, providerID, source, startIndex, sf.secretFinder)
 		}
 	}
 }
@@ -618,7 +640,7 @@ func findXMLStringSecret(source string, startIndex int64, providerID string, re 
 //checks whether the current event is true CharData by checking for the closing marker ]]>
 func isCharData(file io.ReadSeeker, start int64) bool {
 	if start > 3 {
-		if _, err := file.Seek(start-3, 0); err != nil {
+		if _, err := file.Seek(start-3, io.SeekStart); err != nil {
 			return false
 		}
 		data := make([]byte, 3)
@@ -631,10 +653,13 @@ func isCharData(file io.ReadSeeker, start int64) bool {
 
 //used for XML elements and attribute "assignments"
 func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isElement bool, finder *xmlSecretFinder) {
-
-	start := sourceIndex - int64(len(assignedVal))
-	end := sourceIndex
+	start := sourceIndex - int64(1) //peg the startindex back by 1 char
+	end := start + int64(len(assignedVal))
+	if !isElement {
+		end = sourceIndex + int64(len(variable)+len(assignedVal)+3) // 3 chars to account for = and ""
+	}
 	variable = strings.ToLower(variable)
+	rawAssigned := assignedVal
 	assignedVal = strings.TrimSpace(assignedVal)
 
 	if isElement && assignedVal == "" {
@@ -697,6 +722,6 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 		finder.Broadcast(diagnostic)
 	} else {
 		//deal with case where element or attribute name does not suggest value is a secret
-		processXMLStrings(assignedVal, sourceIndex, finder)
+		processXMLStrings(rawAssigned, sourceIndex, finder)
 	}
 }

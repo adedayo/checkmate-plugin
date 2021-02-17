@@ -14,7 +14,7 @@ var (
 
 func detectSecret(secret string) (evidence diagnostics.Evidence) {
 	evidence.Description = descNotSecret
-	evidence.Confidence = diagnostics.Low
+	evidence.Confidence = diagnostics.High
 	secret = strings.TrimSpace(secret)
 	data := strings.ToLower(secret)
 	if data == "" ||
@@ -31,8 +31,10 @@ func detectSecret(secret string) (evidence diagnostics.Evidence) {
 	} else if isCommonSecret(data) {
 		evidence.Description = descCommonSecret
 		evidence.Confidence = diagnostics.High
-	} else if length := float64(len(secret)); length > float64(minSecretLength) && length <= 64 && getShannonEntropy(secret) > entropyCutoff*math.Log2(length) {
+	} else if length := float64(len(secret)); length > float64(minSecretLength) && length <= 64 &&
+		getShannonEntropy(secret) > entropyCutoff*math.Log2(length) && digit.FindStringSubmatchIndex(secret) != nil {
 		//for strings up to 64 characters in length, check that the entropy is at most half the maximum entropy possible for that data
+		//also check that there is at least a number in the secret
 		evidence.Description = descHighEntropy
 		evidence.Confidence = diagnostics.Medium
 	} else if isEncodedSecret(data) {
