@@ -46,11 +46,13 @@ var (
 	attributeAssignmentProviderID = "AttributeSecretAssignment"
 	longStringProviderID          = "LongOrSuspiciousSecretString"
 	secretStringProviderID        = "SuspiciousOrCommonSecretString"
+	recognisedFiles               = map[string]bool{".java": true, ".scala": true, ".kt": true, ".go": true, ".c": true,
+		".cpp": true, ".cc": true, ".c++": true, ".h++": true, ".hh": true, ".hpp": true, ".xml": true,
+		".json": true, ".yaml": true, ".yml": true, ".rb": true, ".erb": true, ".conf": true}
 )
 
 //GetFinderForFileType returns the appropriate MatchProvider based on the file type hint
 func GetFinderForFileType(fileType, filePath string, options SecretSearchOptions) MatchProvider {
-
 	switch strings.ToLower(fileType) {
 	case ".java", ".scala", ".kt", ".go":
 		return NewJavaFinder(options)

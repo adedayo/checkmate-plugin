@@ -193,12 +193,38 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 		return
 	}
 	ext := filepath.Ext(path)
+	cutOffSize := int64(10240)
+
 	if _, present := common.TextFileExtensions[ext]; present {
 		if f, err := os.Open(path); err == nil {
+			if _, present := recognisedFiles[ext]; !present {
+				//Skip searching file not in standard recognised parsable files and greater than 10Mb in size
+				if stat, err := f.Stat(); err == nil && stat.Size() > cutOffSize {
+					if pathBSF.verbose {
+						why := fmt.Sprintf("Skipped: File %s exceeds %d bytes in size", path, cutOffSize)
+						issue := diagnostics.SecurityDiagnostic{
+							Location:   &path,
+							ProviderID: &confidentialFilesProviderID,
+							Justification: diagnostics.Justification{
+								Headline: diagnostics.Evidence{
+									Description: why,
+									Confidence:  diagnostics.High,
+								},
+							},
+							Excluded: true,
+							SHA256:   computeFileHash(pathBSF.options.CalculateChecksum, path),
+						}
+						pathBSF.Broadcast(issue)
+					}
+					f.Close()
+					return
+				}
+			}
 			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.options), pathBSF.options.ShowSource) {
 				issue.Location = &path
 				pathBSF.Broadcast(issue)
 			}
+
 			f.Close()
 		}
 	} else {
