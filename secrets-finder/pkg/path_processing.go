@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -169,13 +170,17 @@ type pathBasedSourceSecretFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
 	diagnostics.ExclusionProvider
 	showSource bool
-	verbose    bool //if set, generate diagnostics for excluded files/paths and values
 	options    SecretSearchOptions
 }
 
 func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
+
+	if pathBSF.options.Verbose {
+		log.Printf("Processing file: %s\n", path)
+	}
+
 	if pathBSF.ShouldExcludePath(path) {
-		if pathBSF.verbose {
+		if pathBSF.options.ReportIgnored {
 			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
 			issue := diagnostics.SecurityDiagnostic{
 				Location:   &path,
@@ -200,7 +205,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 			if _, present := recognisedFiles[ext]; !present {
 				//Skip searching file not in standard recognised parsable files and greater than 10Mb in size
 				if stat, err := f.Stat(); err == nil && stat.Size() > cutOffSize {
-					if pathBSF.verbose {
+					if pathBSF.options.ReportIgnored {
 						why := fmt.Sprintf("Skipped: File %s exceeds %d bytes in size", path, cutOffSize)
 						issue := diagnostics.SecurityDiagnostic{
 							Location:   &path,
@@ -228,7 +233,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 			f.Close()
 		}
 	} else {
-		if pathBSF.verbose {
+		if pathBSF.options.ReportIgnored {
 			why := fmt.Sprintf("Skipped: File extension %s is ignored", ext)
 			issue := diagnostics.SecurityDiagnostic{
 				Location:   &path,
