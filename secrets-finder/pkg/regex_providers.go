@@ -477,8 +477,8 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 			comment := string(se)
 			processXMLStrings(comment, decoder.InputOffset()-int64(len(comment)+3 /**the 3 --> chars */), xf)
 		case xml.EndElement:
-			if x, e := stack.pop(); e != nil || se.Name.Local != x {
-				log.Printf("%s, got tag %s, expecting %s", e.Error(), x, se.Name.Local)
+			if _, e := stack.pop(); e != nil {
+				log.Printf("%s", e.Error())
 			}
 		default:
 		}
