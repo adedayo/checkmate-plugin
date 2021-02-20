@@ -489,6 +489,9 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 //this may fail, in which case we will just simply return the original offset passed to the function
 func findElementOffset(file io.ReadSeeker, offset int64, element string) int64 {
 	length := 2 * len(element) // we are going to search backwards reading twice (arbitrary) the length of the attribute
+	if length == 0 {           //degenerate case
+		return offset
+	}
 	maxReverseDistance := 1024 // beyond which we will give up
 	stopString := fmt.Sprintf("<%s", element)
 	for traversed := length; traversed <= maxReverseDistance; traversed += length {
