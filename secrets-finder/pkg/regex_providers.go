@@ -187,7 +187,8 @@ func NewXMLSecretsFinders(filePath string, options SecretSearchOptions) MatchPro
 			makeXMLSecretsFinder(filePath, []idRegexPair{
 				{xmlAssignmentProviderID, secretAssignment},
 				{xmlAssignmentProviderID, yamlAssignment},
-				{xmlAssignmentProviderID, arrowAssignment},
+				{xmlAssignmentProviderID, arrowNoQuoteLeft},
+				{xmlAssignmentProviderID, arrowQuoteLeft},
 				{secretTagProviderID, secretUnquotedText},
 				{longTagValueProviderID, longUnquotedText},
 				{secretStringProviderID, secretStrings},

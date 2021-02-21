@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	javaVar  = `[a-zA-Z_$0-9]`
+	javaVar  = `[a-zA-Z_$0-9-]`
 	quote    = `(?:["'` + "`])"
 	notQuote = `(?:[^'"` + "`]*)"
 	//TODO cater for tripple quoted strings """ ... """ style
@@ -19,10 +19,12 @@ var (
 	confAssignment          = regexp.MustCompile(fmt.Sprintf(`%s\s*[+]?!?=?\s*(%s)`, secretVar, quotedString))
 	secretCPPAssignment     = regexp.MustCompile(fmt.Sprintf(`%s\s*[+]?!?==?\s*L?(%s)`, secretVar, quotedString))
 	secretDefine            = regexp.MustCompile(fmt.Sprintf(`(?i:#define)\s+%s\s+L?(%s)`, secretVar, quotedString))
-	jsonAssignmentNumOrBool = regexp.MustCompile(fmt.Sprintf(`%s?\s*%s\s*%s?\s*:\s*(\d+|(?i:true|false))`, quote, secretVar, quote))
-	jsonAssignmentString    = regexp.MustCompile(fmt.Sprintf(`%s?\s*%s\s*%s?\s*:\s*(%s)`, quote, secretVar, quote, quotedString))
-	yamlAssignment          = regexp.MustCompile(fmt.Sprintf(`%s?\s*%s\s*%s?\s*:\s*(%s)`, quote, secretVar, quote, quotedString))
-	arrowAssignment         = regexp.MustCompile(fmt.Sprintf(`%s?\s*%s\s*%s?\s*=>\s*(%s)`, quote, secretVar, quote, quotedString))
+	jsonAssignmentNumOrBool = regexp.MustCompile(fmt.Sprintf(`(?i:"%s"\s*:\s*(\d+|true|false)[^\n]*\n)`, secretVar))                            //this regex is still unreliable
+	jsonAssignmentString    = regexp.MustCompile(fmt.Sprintf(`(?U:%s\s*%s\s*%s\s*:\s*(%s)[^\n]*\n)`, quote, secretVar, quote, quotedString))    //(?U: ... ) to make it ungreedy
+	yamlAssignment          = regexp.MustCompile(fmt.Sprintf(`(?U:%s?\s*%s\s*%s?\s*:\s*(%s|[^\n]*\n))`, quote, secretVar, quote, quotedString)) //keep \n in the capture (%s|[^\n]*\n)
+	arrowQuoteLeft          = regexp.MustCompile(fmt.Sprintf(`(?U:%s\s*%s\s*%s\s*=>\s*(%s|[^\n]*\n))`, quote, secretVar, quote, quotedString))
+	arrowNoQuoteLeft        = regexp.MustCompile(fmt.Sprintf(`(?U:\s*%s\s*=>\s*(%s|[^\n]*\n))`, secretVar, quotedString))
+	// arrowAssignment = regexp.MustCompile(fmt.Sprintf(`(?U:%s?\s*%s\s*%s?\s*=>\s*(%s|[^\n]*\n))`, quote, secretVar, quote, quotedString))
 
 	encodedSecretPatterns = []string{
 		`[a-z0-9+/]{0,8}[0-9][a-z0-9+/]{8,}={1,2}`, //Base64-like string
