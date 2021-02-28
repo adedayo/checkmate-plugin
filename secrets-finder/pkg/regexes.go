@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/adedayo/checkmate-core/pkg/diagnostics"
 )
 
 var (
@@ -50,6 +52,8 @@ var (
 	//freeform text terminated by space
 	secretUnquotedText = regexp.MustCompile(fmt.Sprintf(`\s*((?i:%s[^\s]*))\s*`, secretStringIndicators))
 	longUnquotedText   = regexp.MustCompile(fmt.Sprintf(`([^\s]{%d,})\s*`, minSecretLength))
+
+	testFile = regexp.MustCompile(`(?i:.*/(?:tests?/.*|[^/]*test[^/]*)$)`) //match files with /test/ or /tests/ in the path or with test in the filename
 )
 
 func init() {
@@ -74,4 +78,18 @@ func setupSecretStringsIndicators() string {
 	indicators = append(indicators, commonSecretPatterns...)
 	indicators = append(indicators, encodedSecretPatterns...)
 	return strings.Join(indicators, "|")
+}
+
+//MakeCommonExclusions creates an ExcludeDefinition that contains common patterns of files that do not contain secrets
+func MakeCommonExclusions() diagnostics.ExcludeDefinition {
+
+	return diagnostics.ExcludeDefinition{
+		PathExclusionRegExs: []string{
+			`.*[.]html?`,             //HTML files
+			`.*/package-lock[.]json`, //package-lock.json files are high false positive files
+			`.*/node_modules/.*`,     //node compiled libraries
+			`.*[.]md`,                //Markdown files
+		},
+	}
+
 }

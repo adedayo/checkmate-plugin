@@ -10,4 +10,5 @@ type SecretSearchOptions struct {
 	CalculateChecksum     bool
 	Verbose               bool //Verbose logging of file paths about to be scanned
 	ReportIgnored         bool //if set, generate diagnostics for excluded files/paths and values
+	ExcludeTestFiles      bool //if set, excludes suspected Test Files
 }

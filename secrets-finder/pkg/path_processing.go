@@ -124,26 +124,66 @@ type confidentialFilesFinder struct {
 }
 
 func (cff confidentialFilesFinder) ConsumePath(path string) {
-	if cff.ShouldExcludePath(path) {
-		if cff.verbose {
-			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
-			issue := diagnostics.SecurityDiagnostic{
-				Location:   &path,
-				ProviderID: &confidentialFilesProviderID,
-				Justification: diagnostics.Justification{
-					Headline: diagnostics.Evidence{
-						Description: why,
-						Confidence:  diagnostics.High,
-					},
-				},
-				Excluded: true,
-				SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
-			}
-			cff.Broadcast(issue)
-		}
-		return
-	}
+	isTestFile := testFile.MatchString(path)
 	if confidential, why := common.IsConfidentialFile(path); confidential {
+
+		if cff.options.Verbose {
+			log.Printf("Processing file: %s\n", path)
+		}
+
+		if cff.options.ExcludeTestFiles {
+			if isTestFile {
+				if cff.options.Verbose {
+					log.Printf("Skipping suspected test file %s\n", path)
+				}
+				if cff.options.ReportIgnored {
+					why := fmt.Sprintf("Skipped: Suspected test file %s", path)
+					issue := diagnostics.SecurityDiagnostic{
+						Location:   &path,
+						ProviderID: &confidentialFilesProviderID,
+						Justification: diagnostics.Justification{
+							Headline: diagnostics.Evidence{
+								Description: why,
+								Confidence:  diagnostics.High,
+							},
+						},
+						Excluded: true,
+						SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
+					}
+					issue.AddTag("test")
+					cff.Broadcast(issue)
+				}
+				return
+			}
+		}
+
+		if cff.ShouldExcludePath(path) {
+			if cff.options.Verbose {
+				log.Printf("Skipping excluded path %s\n", path)
+			}
+
+			if cff.options.ReportIgnored {
+				why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
+				issue := diagnostics.SecurityDiagnostic{
+					Location:   &path,
+					ProviderID: &confidentialFilesProviderID,
+					Justification: diagnostics.Justification{
+						Headline: diagnostics.Evidence{
+							Description: why,
+							Confidence:  diagnostics.High,
+						},
+					},
+					Excluded: true,
+					SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
+				}
+				if isTestFile {
+					issue.AddTag("test")
+				}
+				cff.Broadcast(issue)
+			}
+			return
+		}
+
 		why = fmt.Sprintf("Warning! You may be sharing confidential (%s) data with your code", why)
 		issue := diagnostics.SecurityDiagnostic{
 			Location:   &path,
@@ -162,6 +202,9 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 				},
 			},
 		}
+		if isTestFile {
+			issue.AddTag("test")
+		}
 		cff.Broadcast(issue)
 	}
 }
@@ -175,11 +218,44 @@ type pathBasedSourceSecretFinder struct {
 
 func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 
+	isTestFile := testFile.MatchString(path)
+
 	if pathBSF.options.Verbose {
 		log.Printf("Processing file: %s\n", path)
 	}
 
+	if pathBSF.options.ExcludeTestFiles {
+		if isTestFile {
+			if pathBSF.options.Verbose {
+				log.Printf("Skipping suspected test File %s\n", path)
+			}
+			if pathBSF.options.ReportIgnored {
+				why := fmt.Sprintf("Skipped: Suspected test file %s", path)
+				issue := diagnostics.SecurityDiagnostic{
+					Location:   &path,
+					ProviderID: &confidentialFilesProviderID,
+					Justification: diagnostics.Justification{
+						Headline: diagnostics.Evidence{
+							Description: why,
+							Confidence:  diagnostics.High,
+						},
+					},
+					Excluded: true,
+					SHA256:   computeFileHash(pathBSF.options.CalculateChecksum, path),
+				}
+				issue.AddTag("test")
+				pathBSF.Broadcast(issue)
+			}
+			return
+		}
+	}
+
 	if pathBSF.ShouldExcludePath(path) {
+
+		if pathBSF.options.Verbose {
+			log.Printf("Skipping excluded path %s\n", path)
+		}
+
 		if pathBSF.options.ReportIgnored {
 			why := fmt.Sprintf("Skipped: An exclusion matches path %s", path)
 			issue := diagnostics.SecurityDiagnostic{
@@ -192,6 +268,9 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 					},
 				},
 				Excluded: true,
+			}
+			if isTestFile {
+				issue.AddTag("test")
 			}
 			pathBSF.Broadcast(issue)
 		}
@@ -219,6 +298,9 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 							Excluded: true,
 							SHA256:   computeFileHash(pathBSF.options.CalculateChecksum, path),
 						}
+						if isTestFile {
+							issue.AddTag("test")
+						}
 						pathBSF.Broadcast(issue)
 					}
 					f.Close()
@@ -227,6 +309,9 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 			}
 			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.options), pathBSF.options.ShowSource) {
 				issue.Location = &path
+				if isTestFile {
+					issue.AddTag("test")
+				}
 				pathBSF.Broadcast(issue)
 			}
 
@@ -244,6 +329,9 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 						Confidence:  diagnostics.High,
 					},
 				},
+			}
+			if isTestFile {
+				issue.AddTag("test")
 			}
 			pathBSF.Broadcast(issue)
 		}

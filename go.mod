@@ -3,7 +3,7 @@ module github.com/adedayo/checkmate-plugin
 go 1.15
 
 require (
-	github.com/adedayo/checkmate-core v0.1.3
+	github.com/adedayo/checkmate-core v0.1.4
 	github.com/golang/protobuf v1.4.3
 	github.com/hashicorp/go-hclog v0.15.0
 	github.com/hashicorp/go-plugin v1.4.0
@@ -14,4 +14,4 @@ require (
 	google.golang.org/protobuf v1.25.0
 )
 
-// replace github.com/adedayo/checkmate-core v0.1.1 => ../checkmate-core
+// replace github.com/adedayo/checkmate-core v0.1.4 => ../checkmate-core
