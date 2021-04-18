@@ -22,8 +22,8 @@ var (
 
 //SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
 //Streams back security diagnostics and paths
-func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan diagnostics.SecurityDiagnostic, chan []string) {
-	out := make(chan diagnostics.SecurityDiagnostic)
+func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *diagnostics.SecurityDiagnostic, chan []string) {
+	out := make(chan *diagnostics.SecurityDiagnostic)
 	pathsOut := make(chan []string)
 	repositories, local := determineAndCloneRepositories(paths)
 	paths = local
@@ -35,7 +35,7 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan dia
 	for repo, loc := range repositories {
 		repoMapper[loc] = repo
 	}
-	collector := func(diagnostic diagnostics.SecurityDiagnostic) {
+	collector := func(diagnostic *diagnostics.SecurityDiagnostic) {
 		location := *diagnostic.Location
 		for loc, repo := range repoMapper {
 			location = strings.Replace(location, loc, repo, 1)
@@ -47,16 +47,16 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan dia
 		out <- diagnostic
 	}
 
-	var consumers []util.PathConsumer
+	var pathConsumers []util.PathConsumer
 	if options.ConfidentialFilesOnly {
-		consumers = []util.PathConsumer{
+		pathConsumers = []util.PathConsumer{
 			&confidentialFilesFinder{
 				ExclusionProvider: options.Exclusions,
 				options:           options,
 			},
 		}
 	} else {
-		consumers = []util.PathConsumer{
+		pathConsumers = []util.PathConsumer{
 			&confidentialFilesFinder{
 				ExclusionProvider: options.Exclusions,
 				options:           options,
@@ -70,12 +70,12 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan dia
 
 	}
 	providers := []diagnostics.SecurityDiagnosticsProvider{}
-	for _, c := range consumers {
+	for _, c := range pathConsumers {
 		providers = append(providers, c.(diagnostics.SecurityDiagnosticsProvider))
 	}
 	common.RegisterDiagnosticsConsumer(collector, providers...)
 
-	mux := util.NewPathMultiplexer(consumers...)
+	mux := util.NewPathMultiplexer(pathConsumers...)
 
 	go func() {
 		allFiles := []string{}
@@ -119,7 +119,6 @@ func determineAndCloneRepositories(paths []string) (map[string]string, []string)
 type confidentialFilesFinder struct {
 	diagnostics.DefaultSecurityDiagnosticsProvider
 	diagnostics.ExclusionProvider
-	verbose bool //if set, generate diagnostics for excluded files/paths
 	options SecretSearchOptions
 }
 
@@ -151,7 +150,7 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 						SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
 					}
 					issue.AddTag("test")
-					cff.Broadcast(issue)
+					cff.Broadcast(&issue)
 				}
 				return
 			}
@@ -179,7 +178,7 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 				if isTestFile {
 					issue.AddTag("test")
 				}
-				cff.Broadcast(issue)
+				cff.Broadcast(&issue)
 			}
 			return
 		}
@@ -205,7 +204,7 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 		if isTestFile {
 			issue.AddTag("test")
 		}
-		cff.Broadcast(issue)
+		cff.Broadcast(&issue)
 	}
 }
 
@@ -244,7 +243,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 					SHA256:   computeFileHash(pathBSF.options.CalculateChecksum, path),
 				}
 				issue.AddTag("test")
-				pathBSF.Broadcast(issue)
+				pathBSF.Broadcast(&issue)
 			}
 			return
 		}
@@ -272,7 +271,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 			if isTestFile {
 				issue.AddTag("test")
 			}
-			pathBSF.Broadcast(issue)
+			pathBSF.Broadcast(&issue)
 		}
 		return
 	}
@@ -301,7 +300,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 						if isTestFile {
 							issue.AddTag("test")
 						}
-						pathBSF.Broadcast(issue)
+						pathBSF.Broadcast(&issue)
 					}
 					f.Close()
 					return
@@ -333,7 +332,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 			if isTestFile {
 				issue.AddTag("test")
 			}
-			pathBSF.Broadcast(issue)
+			pathBSF.Broadcast(&issue)
 		}
 	}
 }

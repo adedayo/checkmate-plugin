@@ -85,10 +85,12 @@ func MakeCommonExclusions() diagnostics.ExcludeDefinition {
 
 	return diagnostics.ExcludeDefinition{
 		PathExclusionRegExs: []string{
-			`.*[.]html?`,             //HTML files
-			`.*/package-lock[.]json`, //package-lock.json files are high false positive files
-			`.*/node_modules/.*`,     //node compiled libraries
-			`.*[.]md`,                //Markdown files
+			`.*[.](?i:html?|css)`,           //HTML and CSS files
+			`.*/[.]git/.*`,                  //skip git files
+			`.*/package-lock[.]json`,        //package-lock.json files are high false positive files
+			`.*/node_modules/.*`,            //node compiled libraries
+			`.*[.]md`,                       //Markdown files
+			`.*[.](?i:lock|xib|storyboard)`, //lock, xib and storyboard files
 		},
 	}
 

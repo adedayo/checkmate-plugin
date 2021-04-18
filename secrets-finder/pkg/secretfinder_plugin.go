@@ -41,7 +41,7 @@ func (sfp *FinderPlugin) Scan(req *pb.ScanRequest, stream pb.PluginService_ScanS
 		CalculateChecksum:     req.CalculateChecksum,
 	})
 	for diagnostic := range diags {
-		if err := stream.Send(model.ConvertSecurityDiagnostic(&diagnostic)); err != nil {
+		if err := stream.Send(model.ConvertSecurityDiagnostic(diagnostic)); err != nil {
 			return err
 		}
 	}

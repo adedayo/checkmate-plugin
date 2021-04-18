@@ -577,7 +577,7 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 			s := source[start:end]
 			diagnostic.Source = &s
 		}
-		sf.Broadcast(diagnostic)
+		sf.Broadcast(&diagnostic)
 	}
 }
 
@@ -626,7 +626,7 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 		s := source[start:end]
 		diagnostic.Source = &s
 	}
-	sf.Broadcast(diagnostic)
+	sf.Broadcast(&diagnostic)
 }
 
 func findXMLStringSecret(source string, startIndex int64, providerID string, re *regexp.Regexp, sf *xmlSecretFinder) {
@@ -725,7 +725,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 			}
 			diagnostic.Source = &s
 		}
-		finder.Broadcast(diagnostic)
+		finder.Broadcast(&diagnostic)
 	} else {
 		//deal with case where element or attribute name does not suggest value is a secret
 		processXMLStrings(rawAssigned, sourceIndex, finder)

@@ -9,10 +9,10 @@ import (
 )
 
 //FindSecret locates secrets contained in a source that implements `io.Reader` interface using a `MatchProvider`
-func FindSecret(filePath string, source io.Reader, matcher MatchProvider, shouldProvideSourceInDiagnostics bool) chan diagnostics.SecurityDiagnostic {
-	out := make(chan diagnostics.SecurityDiagnostic)
+func FindSecret(filePath string, source io.Reader, matcher MatchProvider, shouldProvideSourceInDiagnostics bool) chan *diagnostics.SecurityDiagnostic {
+	out := make(chan *diagnostics.SecurityDiagnostic)
 	aggregator := common.MakeSimpleAggregator()
-	collector := func(diagnostic diagnostics.SecurityDiagnostic) {
+	collector := func(diagnostic *diagnostics.SecurityDiagnostic) {
 		aggregator.AddDiagnostic(diagnostic)
 	}
 
