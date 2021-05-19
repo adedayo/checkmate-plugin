@@ -204,6 +204,9 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 		if isTestFile {
 			issue.AddTag("test")
 		}
+		if confidential {
+			issue.AddTag("confidential")
+		}
 		cff.Broadcast(&issue)
 	}
 }
