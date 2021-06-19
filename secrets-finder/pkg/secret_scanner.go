@@ -18,14 +18,25 @@ type SecretScanner struct {
 func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.ProjectManager,
 	progressCallback func(diagnostics.Progress), consumers ...diagnostics.SecurityDiagnosticsConsumer) {
 
-	//ensure scan config and project exist
+	//ensure project and scan config exist
+	proj := pm.GetProject(projectID)
+	if proj.ID != projectID {
+		return // no such project
+	}
+
 	scanConfig := pm.GetScanConfig(projectID, scanID)
 	if scanConfig.ID == "" {
 		return //no such scan confguration
 	}
-	proj := pm.GetProject(projectID)
-	if proj.ID != projectID {
-		return // no such project
+
+	if excl, err := diagnostics.CompileExcludes(&scanConfig.Policy); err == nil {
+		scanner.options.Exclusions = excl
+	}
+
+	if o, present := scanConfig.Config["secret-search-options"]; present {
+		if opts, ok := o.(SecretSearchOptions); ok {
+			scanner.options = opts
+		}
 	}
 
 	//get paths and check out repositories as may be necessary
@@ -135,7 +146,6 @@ func cloneRepositories(repo []projects.Repository) (map[string]string, []string)
 		default:
 			//ignore any other types of repos
 		}
-
 	}
 	return repoMap, local
 }

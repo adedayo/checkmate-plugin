@@ -14,4 +14,4 @@ require (
 	google.golang.org/protobuf v1.26.0
 )
 
-// replace github.com/adedayo/checkmate-core v0.1.5 => ../checkmate-core
+replace github.com/adedayo/checkmate-core v0.1.6 => ../checkmate-core

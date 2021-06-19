@@ -3,6 +3,7 @@ package secrets
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,6 +19,7 @@ var (
 	confidentialFilesProviderID     = "ConfidentialFiles"
 	pathBasedSecretFinderProviderID = "PathBasedSecretsFinder"
 	gitURL                          = regexp.MustCompile(`\s*(?i:https?://|git@).*`)
+	TenMB                           = int64(1024 * 1000 * 10) // 10Mb
 )
 
 //SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
@@ -279,10 +281,11 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 		return
 	}
 	ext := filepath.Ext(path)
-	cutOffSize := int64(10240)
+	cutOffSize := TenMB
 
-	if _, present := common.TextFileExtensions[ext]; present {
+	if _, present := common.TextFileExtensions[ext]; present || ext == "" { //now scan files without extensions, TODO: avoid binary files
 		if f, err := os.Open(path); err == nil {
+			defer f.Close()
 			if _, present := recognisedFiles[ext]; !present {
 				//Skip searching file not in standard recognised parsable files and greater than 10Mb in size
 				if stat, err := f.Stat(); err == nil && stat.Size() > cutOffSize {
@@ -305,8 +308,16 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 						}
 						pathBSF.Broadcast(&issue)
 					}
-					f.Close()
 					return
+				}
+
+				if ext == "" {
+					buff := make([]byte, 512)
+					_, err := f.Read(buff)
+					if err == nil && !strings.Contains(http.DetectContentType(buff), "text/plain") {
+						//we found a non-textual file with no extension, skip scanning
+						return
+					}
 				}
 			}
 			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.options), pathBSF.options.ShowSource) {
@@ -314,7 +325,11 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 				if isTestFile {
 					issue.AddTag("test")
 				}
-				pathBSF.Broadcast(issue)
+
+				val := issue.GetValue()
+				if !pathBSF.ShouldExclude(path, val) {
+					pathBSF.Broadcast(issue)
+				}
 			}
 
 			f.Close()

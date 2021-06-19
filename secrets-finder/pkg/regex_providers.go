@@ -146,6 +146,11 @@ func (dmp defaultMatchProvider) GetFinders() []common.ResourceToSecurityDiagnost
 }
 
 func (dmp defaultMatchProvider) ShouldExclude(pathContext, value string) bool {
+	for _, finder := range dmp.GetFinders() {
+		if finder.ShouldExclude(pathContext, value) {
+			return true
+		}
+	}
 	return false
 }
 
@@ -189,8 +194,8 @@ func NewXMLSecretsFinders(filePath string, options SecretSearchOptions) MatchPro
 				{xmlAssignmentProviderID, yamlAssignment},
 				{xmlAssignmentProviderID, arrowNoQuoteLeft},
 				{xmlAssignmentProviderID, arrowQuoteLeft},
-				{secretTagProviderID, secretUnquotedText},
-				{longTagValueProviderID, longUnquotedText},
+				{secretTagProviderID, secretUnquotedTextRegex},
+				{longTagValueProviderID, longUnquotedTextRegex},
 				{secretStringProviderID, secretStrings},
 				{longStringProviderID, longStrings},
 			}, options),
@@ -573,11 +578,13 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 			diagnostic.Justification.Headline.Confidence > diagnostics.Medium {
 			diagnostic.Justification.Headline.Confidence = diagnostics.Medium
 		}
+		s := source[start:end]
 		if sf.provideSource {
-			s := source[start:end]
 			diagnostic.Source = &s
 		}
-		sf.Broadcast(&diagnostic)
+		if !sf.ShouldExcludeValue(s) {
+			sf.Broadcast(&diagnostic)
+		}
 	}
 }
 
@@ -622,11 +629,13 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 	if diagnostic.Justification.Reasons[1].Confidence == diagnostics.High {
 		diagnostic.Justification.Headline.Confidence = diagnostics.High
 	}
+	s := source[start:end]
 	if sf.provideSource {
-		s := source[start:end]
 		diagnostic.Source = &s
 	}
-	sf.Broadcast(&diagnostic)
+	if !sf.ShouldExcludeValue(s) {
+		sf.Broadcast(&diagnostic)
+	}
 }
 
 func findXMLStringSecret(source string, startIndex int64, providerID string, re *regexp.Regexp, sf *xmlSecretFinder) {
@@ -703,7 +712,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 				Start: finder.lineKeeper.GetPositionFromCharacterIndex(start),
 				End:   finder.lineKeeper.GetPositionFromCharacterIndex(end),
 			},
-			HighlightRange: code.Range{
+			HighlightRange: code.Range{ //TODO the highlighted range is the same as the total range, fix
 				Start: finder.lineKeeper.GetPositionFromCharacterIndex(start),
 				End:   finder.lineKeeper.GetPositionFromCharacterIndex(end),
 			},
