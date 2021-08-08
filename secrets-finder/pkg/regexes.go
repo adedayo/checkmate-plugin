@@ -43,6 +43,7 @@ var (
 	secretStringIndicators = setupSecretStringsIndicators()
 	commonSecrets          = []*regexp.Regexp{}
 	encodedSecrets         = []*regexp.Regexp{}
+	vendorSecrets          = map[string]*regexp.Regexp{}
 	upperCase              = regexp.MustCompile(`[A-Z]`)
 	lowerCase              = regexp.MustCompile(`[a-z]`)
 	digit                  = regexp.MustCompile(`\d`)
@@ -51,10 +52,10 @@ var (
 	longStrings            = regexp.MustCompile(fmt.Sprintf(`((?:%s){%d,})`, stringLikeValues, minSecretLength))
 	secretStrings          = regexp.MustCompile(fmt.Sprintf(`(%s%s(?i:%s)%s%s)`, quote, notQuote, secretStringIndicators, notQuote, quote))
 	//e.g <x> pasword123 </x>
-	secretTagValues   = regexp.MustCompile(fmt.Sprintf(`>\s*((?i:%s[^<]*))<`, secretStringIndicators))
-	longTagValues     = regexp.MustCompile(fmt.Sprintf(`>([^\s<]{%d,})<`, minSecretLength))
-	longUnbrokenValue = regexp.MustCompile(fmt.Sprintf(`([^\s]{%d,}\s)`, minSecretLength))
-	secretTags        = regexp.MustCompile(fmt.Sprintf(`<\s*%s\s*>([^<]*)<`, secretVar))
+	secretTagValues = regexp.MustCompile(fmt.Sprintf(`>\s*((?i:%s[^<]*))<`, secretStringIndicators))
+	longTagValues   = regexp.MustCompile(fmt.Sprintf(`>([^\s<]{%d,})<`, minSecretLength))
+	// longUnbrokenValue = regexp.MustCompile(fmt.Sprintf(`([^\s]{%d,}\s)`, minSecretLength))
+	secretTags = regexp.MustCompile(fmt.Sprintf(`<\s*%s\s*>([^<]*)<`, secretVar))
 
 	testFile = regexp.MustCompile(`(?i:.*/(?:tests?/.*|[^/]*test[^/]*)$)`) //match files with /test/ or /tests/ in the path or with test in the filename
 )
@@ -62,6 +63,7 @@ var (
 func init() {
 	setupCommonSecrets()
 	setupEncodedSecrets()
+	setupVendorSecrets()
 }
 
 func setupCommonSecrets() {
@@ -73,6 +75,12 @@ func setupCommonSecrets() {
 func setupEncodedSecrets() {
 	for _, sec := range encodedSecretPatterns {
 		encodedSecrets = append(encodedSecrets, regexp.MustCompile(sec))
+	}
+}
+
+func setupVendorSecrets() {
+	for desc, sec := range vendorSecretPatterns {
+		vendorSecrets[desc] = regexp.MustCompile(sec)
 	}
 }
 
@@ -97,4 +105,45 @@ func MakeCommonExclusions() diagnostics.ExcludeDefinition {
 		},
 	}
 
+}
+
+func MergeExclusions(defs ...diagnostics.ExcludeDefinition) (excl diagnostics.ExcludeDefinition) {
+
+	excl.PathRegexExcludedRegExs = make(map[string][]string)
+	excl.PerFileExcludedStrings = make(map[string][]string)
+	for _, def := range defs {
+		excl.GloballyExcludedRegExs = unique(append(excl.GloballyExcludedRegExs, def.GloballyExcludedRegExs...))
+		excl.GloballyExcludedStrings = unique(append(excl.GloballyExcludedStrings, def.GloballyExcludedStrings...))
+		excl.PathExclusionRegExs = unique(append(excl.PathExclusionRegExs, def.PathExclusionRegExs...))
+		for p, v := range def.PathRegexExcludedRegExs {
+			if _, present := excl.PathRegexExcludedRegExs[p]; present {
+				excl.PathRegexExcludedRegExs[p] = unique(append(excl.PathRegexExcludedRegExs[p], v...))
+			} else {
+				excl.PathRegexExcludedRegExs[p] = unique(v)
+			}
+		}
+		for p, v := range def.PerFileExcludedStrings {
+			if _, present := excl.PerFileExcludedStrings[p]; present {
+				excl.PerFileExcludedStrings[p] = unique(append(excl.PerFileExcludedStrings[p], v...))
+			} else {
+				excl.PerFileExcludedStrings[p] = unique(v)
+			}
+		}
+	}
+
+	return
+}
+
+func unique(xs []string) []string {
+	var nothing struct{}
+	m := make(map[string]struct{})
+	for _, x := range xs {
+		m[x] = nothing
+	}
+
+	out := []string{}
+	for x := range m {
+		out = append(out, x)
+	}
+	return out
 }

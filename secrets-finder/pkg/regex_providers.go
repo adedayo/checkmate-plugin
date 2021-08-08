@@ -17,30 +17,28 @@ import (
 )
 
 var (
-	//JavaFinder provides secret detection in Java-like programming languages
-	// JavaFinder                     MatchProvider
-	descHardCodedSecretAssignment  = "Hard-coded secret assignment"
-	descVarSecret                  = "Variable name suggests it is a secret"
-	descEncodedSecret              = "Value looks suspiciously like an encoded secret (e.g. Base64 or Hex encoded)"
-	descSecretUnbrokenString       = "Unbroken string may be a secret"
-	descConstantAssignment         = "Constant assignment to a variable name that suggests it is a secret"
-	descHardCodedSecret            = "Hard-coded secret"
-	descDefaultSecret              = "Default or common secret value"
+	descHardCodedSecretAssignment = "Hard-coded secret assignment"
+	descVarSecret                 = "Variable name suggests it is a secret"
+	descEncodedSecret             = "Value looks suspiciously like an encoded secret (e.g. Base64 or Hex encoded)"
+	descSecretUnbrokenString      = "Unbroken string may be a secret"
+	// descConstantAssignment         = "Constant assignment to a variable name that suggests it is a secret"
+	descHardCodedSecret = "Hard-coded secret"
+	// descDefaultSecret              = "Default or common secret value"
 	descCommonSecret               = "Value contains or appears to be a common credential"
 	descSuspiciousSecret           = "Value looks suspiciously like a secret"
 	descHighEntropy                = "Value has a high entropy, may be a secret"
 	descNotSecret                  = "Value does not appear to be a secret"
 	unusualPasswordStartCharacters = `<>&^%?#({|/`
 
-	assignmentProviderID          = "SecretAssignment"
-	confAssignmentProviderID      = "ConfSecretAssignment"
-	cppAssignmentProviderID       = "CPPSecretAssignment"
-	longTagValueProviderID        = "LongOrSuspiciousSecretInXML"
-	xmlAssignmentProviderID       = "SecretAssignmentInXML"
-	secretTagProviderID           = "SuspiciousOrCommonSecretInXML"
-	jsonAssignmentProviderID      = "JSONSecretAssignment"
-	yamlAssignmentProviderID      = "YAMLSecretAssignment"
-	arrowAssignmentProviderID     = "ArrowSecretAssignment"
+	assignmentProviderID     = "SecretAssignment"
+	confAssignmentProviderID = "ConfSecretAssignment"
+	cppAssignmentProviderID  = "CPPSecretAssignment"
+	longTagValueProviderID   = "LongOrSuspiciousSecretInXML"
+	xmlAssignmentProviderID  = "SecretAssignmentInXML"
+	secretTagProviderID      = "SuspiciousOrCommonSecretInXML"
+	jsonAssignmentProviderID = "JSONSecretAssignment"
+	yamlAssignmentProviderID = "YAMLSecretAssignment"
+	// arrowAssignmentProviderID     = "ArrowSecretAssignment"
 	defineAssignmentProviderID    = "DefineSecretAssignment"
 	tagAssignmentProviderID       = "ElementSecretAssignment"
 	attributeAssignmentProviderID = "AttributeSecretAssignment"
@@ -56,7 +54,7 @@ func GetFinderForFileType(fileType, filePath string, options SecretSearchOptions
 	switch strings.ToLower(fileType) {
 	case ".java", ".scala", ".kt", ".go":
 		return NewJavaFinder(options)
-	case ".c", ".cpp", ".cc", ".c++", ".h++", ".hh", ".hpp":
+	case ".c", ".cpp", ".cc", ".c++", ".h++", ".hh", ".hpp", ".hxx":
 		return NewCPPSecretsFinders(options)
 	case ".xml":
 		return NewXMLSecretsFinders(filePath, options)
@@ -237,10 +235,10 @@ func NewERubySecretsFinders(options SecretSearchOptions) MatchProvider {
 			makeAssignmentFinder(longTagValueProviderID, longTagValues, options),
 			makeAssignmentFinder(secretTagProviderID, secretTagValues, options),
 			makeSecretStringFinder(secretStringProviderID, secretStrings, options),
+			makeSecretStringFinder(longStringProviderID, longStrings, options),
 			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentNumOrBool, options),
 			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, options),
 			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, options),
-			makeSecretStringFinder(longStringProviderID, longStrings, options),
 		},
 	}
 }
@@ -251,6 +249,7 @@ func NewYamlSecretsFinders(options SecretSearchOptions) MatchProvider {
 		finders: []common.ResourceToSecurityDiagnostics{
 			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, options),
 			makeAssignmentFinder(jsonAssignmentProviderID, jsonAssignmentString, options),
+			makeSecretStringFinder(secretStringProviderID, secretStrings, options),
 			makeSecretStringFinder(longStringProviderID, longStrings, options),
 		},
 	}
@@ -461,7 +460,7 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 				if index := strings.Index(attributes, attr.Name.Local); index != -1 {
 					offset = elementOffSet + int64(index)
 				}
-				processXMLAssignment(attr.Name.Local, attr.Value, offset, false, xf)
+				processXMLAssignment(attr.Name.Local, attr.Value, offset, false, xf, scan)
 			}
 		case xml.CharData: //CDATA <![CDATA[ some CDATA content ]]>
 			//- decoder also sends raw element values e.g. <el>element value</el> as CharData
@@ -473,7 +472,7 @@ func (xf *xmlSecretFinder) ConsumePath(path string) {
 			if !isChar {
 				//deal with element value
 				if el, e := stack.peek(); e == nil {
-					processXMLAssignment(el, cdata, decoder.InputOffset()-int64(len(cdata)), true, xf)
+					processXMLAssignment(el, cdata, decoder.InputOffset()-int64(len(cdata)), true, xf, scan)
 				}
 			} else {
 				//proper CDATA
@@ -546,6 +545,8 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 			evidence.Confidence = diagnostics.High
 		}
 
+		codeStart := startIndex + start
+		codeEnd := startIndex + end
 		diagnostic := diagnostics.SecurityDiagnostic{
 			Justification: diagnostics.Justification{
 				Headline: diagnostics.Evidence{
@@ -560,8 +561,12 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 					evidence},
 			},
 			Range: code.Range{
-				Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
-				End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
+				Start: sf.lineKeeper.GetPositionFromCharacterIndex(codeStart),
+				End:   sf.lineKeeper.GetPositionFromCharacterIndex(codeEnd),
+			},
+			RawRange: diagnostics.CharRange{
+				StartIndex: codeStart,
+				EndIndex:   codeEnd,
 			},
 			HighlightRange: code.Range{
 				Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + rhsStart - 1),
@@ -601,6 +606,8 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 		return //skip high confidence non-secrets
 	}
 
+	codeStart := startIndex + start
+	codeEnd := startIndex + end
 	diagnostic := diagnostics.SecurityDiagnostic{
 		Justification: diagnostics.Justification{
 			Headline: diagnostics.Evidence{
@@ -615,8 +622,12 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 				evidence},
 		},
 		Range: code.Range{
-			Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + start - 1),
-			End:   sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + end - 1),
+			Start: sf.lineKeeper.GetPositionFromCharacterIndex(codeStart),
+			End:   sf.lineKeeper.GetPositionFromCharacterIndex(codeEnd),
+		},
+		RawRange: diagnostics.CharRange{
+			StartIndex: codeStart,
+			EndIndex:   codeEnd,
 		},
 		HighlightRange: code.Range{
 			Start: sf.lineKeeper.GetPositionFromCharacterIndex(startIndex + stringStart - 1),
@@ -667,7 +678,7 @@ func isCharData(file io.ReadSeeker, start int64) bool {
 }
 
 //used for XML elements and attribute "assignments"
-func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isElement bool, finder *xmlSecretFinder) {
+func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isElement bool, finder *xmlSecretFinder, scan io.ReadSeeker) {
 	start := sourceIndex - int64(1) //peg the startindex back by 1 char
 	end := start + int64(len(assignedVal))
 	if !isElement {
@@ -709,11 +720,15 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 					evidence},
 			},
 			Range: code.Range{
-				Start: finder.lineKeeper.GetPositionFromCharacterIndex(start),
+				Start: finder.lineKeeper.GetPositionFromCharacterIndex(start + 1),
 				End:   finder.lineKeeper.GetPositionFromCharacterIndex(end),
 			},
+			RawRange: diagnostics.CharRange{
+				StartIndex: start + 1,
+				EndIndex:   end,
+			},
 			HighlightRange: code.Range{ //TODO the highlighted range is the same as the total range, fix
-				Start: finder.lineKeeper.GetPositionFromCharacterIndex(start),
+				Start: finder.lineKeeper.GetPositionFromCharacterIndex(start + 1),
 				End:   finder.lineKeeper.GetPositionFromCharacterIndex(end),
 			},
 			ProviderID: &providerID,
@@ -728,10 +743,14 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 			diagnostic.Justification.Headline.Confidence = diagnostics.Medium
 		}
 		if finder.provideSource {
-			s := fmt.Sprintf(`%s="%s"`, variable, assignedVal)
-			if isElement {
-				s = fmt.Sprintf(`%s > %s`, variable, assignedVal)
-			}
+			// s := fmt.Sprintf(`%s="%s"`, variable, assignedVal)
+			// if isElement {
+			// 	s = fmt.Sprintf(`%s > %s`, variable, assignedVal)
+			// }
+			buff := make([]byte, end-start+1)
+			scan.Seek(start, io.SeekStart)
+			scan.Read(buff)
+			s := string(buff)
 			diagnostic.Source = &s
 		}
 		finder.Broadcast(&diagnostic)

@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"log"
 	"os"
 	"strings"
 
@@ -117,9 +118,11 @@ func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.P
 	}
 
 	//3. cleanup: delete checked out repositories
+	// if !proj.KeepCheckedOutCode {
 	for _, r := range repositories {
 		os.RemoveAll(r)
 	}
+	// }
 }
 
 func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
@@ -141,6 +144,8 @@ func cloneRepositories(repo []projects.Repository) (map[string]string, []string)
 			if _, present := repoMap[p.Location]; !present {
 				if repo, err := gitutils.Clone(p.Location); err == nil {
 					repoMap[p.Location] = repo
+				} else {
+					log.Printf("%v", err)
 				}
 			}
 		default:

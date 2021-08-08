@@ -283,9 +283,11 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 	ext := filepath.Ext(path)
 	cutOffSize := TenMB
 
-	if _, present := common.TextFileExtensions[ext]; present || ext == "" { //now scan files without extensions, TODO: avoid binary files
+	if _, present := common.TextFileExtensions[ext]; present || ext == "" { //now scan files without extensions
 		if f, err := os.Open(path); err == nil {
 			defer f.Close()
+			//don't scan files larger than cutOffSize, unless they are in recognisedFiles
+			//don't scan files without extension, unless they are smaller than cutOffSize and contain plaintext content
 			if _, present := recognisedFiles[ext]; !present {
 				//Skip searching file not in standard recognised parsable files and greater than 10Mb in size
 				if stat, err := f.Stat(); err == nil && stat.Size() > cutOffSize {
@@ -332,7 +334,6 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 				}
 			}
 
-			f.Close()
 		}
 	} else {
 		if pathBSF.options.ReportIgnored {
