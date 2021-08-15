@@ -13,8 +13,8 @@ var (
 )
 
 func detectSecret(secret string) (evidence diagnostics.Evidence) {
-	evidence.Description = descNotSecret
-	evidence.Confidence = diagnostics.High
+	evidence.Description = descSuspiciousSecret
+	evidence.Confidence = diagnostics.Low
 	secret = strings.TrimSpace(secret)
 	data := strings.ToLower(secret)
 	if data == "" ||
@@ -28,13 +28,13 @@ func detectSecret(secret string) (evidence diagnostics.Evidence) {
 		(strings.Contains(unusualPasswordStartCharacters, string(data[0])) && len(data) > 45) {
 		evidence.Description = descNotSecret
 		evidence.Confidence = diagnostics.High
-	} else if isCommonSecret(data) {
-		evidence.Description = descCommonSecret
-		evidence.Confidence = diagnostics.High
 	} else if description, isVendor := isVendorSecret(data); isVendor {
 		evidence.Description = description
 		evidence.Confidence = diagnostics.High
-	} else if length := float64(len(secret)); length > float64(minSecretLength) && length <= 64 &&
+	} else if isCommonSecret(data) {
+		evidence.Description = descCommonSecret
+		evidence.Confidence = diagnostics.High
+	} else if length := float64(len(secret)); length > float64(minSecretLength) && length <= 256 &&
 		getShannonEntropy(secret) > entropyCutoff*math.Log2(length) && digit.FindStringSubmatchIndex(secret) != nil {
 		//for strings up to 64 characters in length, check that the entropy is at most half the maximum entropy possible for that data
 		//also check that there is at least a number in the secret
@@ -48,7 +48,7 @@ func detectSecret(secret string) (evidence diagnostics.Evidence) {
 		evidence.Confidence = diagnostics.Medium
 	} else if validate(secret) {
 		evidence.Description = descSuspiciousSecret
-		evidence.Confidence = diagnostics.Low
+		evidence.Confidence = diagnostics.Medium
 	}
 	return
 }
@@ -91,7 +91,7 @@ func validateSpecial(data string) bool {
 	return false
 }
 func validate(data string) bool {
-	if len(data) >= minSecretLength &&
+	if length := len(data); length >= minSecretLength && length <= 256 &&
 		upperCase.FindStringSubmatchIndex(data) != nil &&
 		lowerCase.FindStringSubmatchIndex(data) != nil &&
 		digit.FindStringSubmatchIndex(data) != nil &&

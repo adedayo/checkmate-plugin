@@ -77,6 +77,35 @@ func Test_detectSecret(t *testing.T) {
 				Confidence:  diagnostics.High},
 		},
 		{
+			name:   "GitHub Secret",
+			secret: "gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1",
+			wantEvidence: diagnostics.Evidence{
+				Description: descGithubToken,
+				Confidence:  diagnostics.High},
+		},
+		{
+			name:   "Slack Token",
+			secret: "xoxb-333649436676-799261852869-clFJVVIaoJahpORboa3Ba2al",
+			wantEvidence: diagnostics.Evidence{
+				Description: descSlackToken,
+				Confidence:  diagnostics.High},
+		},
+		{
+			name:   "Stripe Token",
+			secret: "sk_test_26PHem9AhJZvU623DfE1x4sd",
+			wantEvidence: diagnostics.Evidence{
+				Description: descStripeToken,
+				Confidence:  diagnostics.High},
+		},
+		{
+			name:   "GoCardless Token",
+			secret: "live_y7VPTOdgFZtFaAS9V8HT3",
+			wantEvidence: diagnostics.Evidence{
+				Description: descGoCardlessToken,
+				Confidence:  diagnostics.High},
+		},
+
+		{
 			name:   "Common Secret",
 			secret: "password1",
 			wantEvidence: diagnostics.Evidence{
@@ -88,7 +117,7 @@ func Test_detectSecret(t *testing.T) {
 			secret: "secret",
 			wantEvidence: diagnostics.Evidence{
 				Description: descNotSecret,
-				Confidence:  diagnostics.Low},
+				Confidence:  diagnostics.High},
 		},
 		{
 			name:   "High Entropy",

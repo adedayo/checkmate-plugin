@@ -18,7 +18,7 @@ var (
 	longUnquotedText        = fmt.Sprintf(`([^\s]{%d,})\s*`, minSecretLength)
 	secretUnquotedTextRegex = regexp.MustCompile(fmt.Sprintf(`\s*((?i:%s[^\s]*))\s*`, secretStringIndicators))
 	longUnquotedTextRegex   = regexp.MustCompile(longUnquotedText)
-	//TODO cater for tripple quoted strings """ ... """ style
+	//TODO cater for tripple quoted strings """ ... """ style => try `"{3,3}[^"]*"{3,3}`
 	stringLikeValues   = /** standard quote */ `(?s:"(?:[^"\\]|\\.)*")` /** tick */ + `|(?s:'(?:[^'\\]|\\.)*')` + /** backtick */ "|(?s:`(?:[^`\\\\]|\\\\.)*`)"
 	secretVarIndicator = `(?i:secret|private|sensitive|confidential|c(?:y|i)pher|crypt|signature|nonce|credential|cert|key|token|salt|auth(?:[^o]|o[^r])+|pass(?:[^e]|e[^ds])+(?:word|phrase)?|ps?wd)`
 	secretVar          = fmt.Sprintf(`(%s*?%s%s*?)`, javaVar, secretVarIndicator, javaVar)
@@ -28,9 +28,9 @@ var (
 	confAssignment          = regexp.MustCompile(fmt.Sprintf(`%s\s*[+]?!?=?\s*(%s)`, secretVar, stringLikeValues))
 	secretCPPAssignment     = regexp.MustCompile(fmt.Sprintf(`%s\s*[+]?!?==?\s*L?(%s)`, secretVar, stringLikeValues))
 	secretDefine            = regexp.MustCompile(fmt.Sprintf(`(?i:#define)\s+%s\s+L?(%s)`, secretVar, stringLikeValues))
-	jsonAssignmentNumOrBool = regexp.MustCompile(fmt.Sprintf(`(?i:"%s"\s*:\s*(\d+|true|false)[^\n]*\n)`, secretVar))                                //this regex is still unreliable
-	jsonAssignmentString    = regexp.MustCompile(fmt.Sprintf(`(?U:%s\s*%s\s*%s\s*:\s*(%s)[^\n]*\n)`, quote, secretVar, quote, stringLikeValues))    //(?U: ... ) to make it ungreedy
-	yamlAssignment          = regexp.MustCompile(fmt.Sprintf(`(?U:%s?\s*%s\s*%s?\s*:\s*(%s|[^\n]*\n))`, quote, secretVar, quote, stringLikeValues)) //keep \n in the capture (%s|[^\n]*\n)
+	jsonAssignmentNumOrBool = regexp.MustCompile(fmt.Sprintf(`(?i:"%s"\s*:\s*(\d+|true|false)[^\n]*\n)`, secretVar))                                   //this regex is still unreliable
+	jsonAssignmentString    = regexp.MustCompile(fmt.Sprintf(`(?U:%s\s*%s\s*%s\s*:\s*(%s)[^\n]*\n)`, quote, secretVar, quote, stringLikeValues))       //(?U: ... ) to make it ungreedy
+	yamlAssignment          = regexp.MustCompile(fmt.Sprintf(`(?U:%s?\s*%s\s*%s?\s*:\s*(%s|[^\n,]*\n),?)`, quote, secretVar, quote, stringLikeValues)) //keep \n in the capture (%s|[^\n]*\n)
 	arrowQuoteLeft          = regexp.MustCompile(fmt.Sprintf(`(?U:%s\s*%s\s*%s\s*=>\s*(%s|[^\n]*\n))`, quote, secretVar, quote, stringLikeValues))
 	arrowNoQuoteLeft        = regexp.MustCompile(fmt.Sprintf(`(?U:\s*%s\s*=>\s*(%s|[^\n]*\n))`, secretVar, stringLikeValues))
 	// arrowAssignment = regexp.MustCompile(fmt.Sprintf(`(?U:%s?\s*%s\s*%s?\s*=>\s*(%s|[^\n]*\n))`, quote, secretVar, quote, quotedString))

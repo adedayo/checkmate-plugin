@@ -2,8 +2,7 @@ package secrets
 
 import (
 	"encoding/json"
-	"io"
-	"reflect"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -12,18 +11,19 @@ import (
 )
 
 func TestFindSecret(t *testing.T) {
-	type args struct {
-		source                           io.Reader
-		matcher                          MatchProvider
-		extension                        string
-		shouldProvideSourceInDiagnostics bool
-	}
+	// type args struct {
+	// 	source                           io.Reader
+	// 	matcher                          MatchProvider
+	// 	extension                        string
+	// 	shouldProvideSourceInDiagnostics bool
+	// }
 	tests := []struct {
-		name      string
-		value     string
-		extension string
-		provider  string
-		evidences [3]diagnostics.Evidence
+		name            string
+		value           string
+		extension       string
+		provider        string
+		evidences       [3]diagnostics.Evidence
+		shouldNotDetect bool //test FPs
 	}{
 		{
 			name:      "Assignment 1",
@@ -42,7 +42,6 @@ func TestFindSecret(t *testing.T) {
 					Confidence:  diagnostics.Low},
 			},
 		},
-
 		{
 			name:      "Assignment 2",
 			value:     `crypt = "HbjZ!+{c]Y5!kNzB+-p^A6bCt(zNtf=V"`,
@@ -59,6 +58,46 @@ func TestFindSecret(t *testing.T) {
 					Description: descHighEntropy,
 					Confidence:  diagnostics.Medium},
 			},
+		},
+		{
+			name:      "Assignment 2.1",
+			value:     `secret  = "HbjZ!+{c]Y5!kNzB+-p^A6bCt(zNtf=V"`,
+			extension: ".java",
+			provider:  assignmentProviderID,
+			evidences: [3]diagnostics.Evidence{
+				{
+					Description: descHardCodedSecretAssignment,
+					Confidence:  diagnostics.High},
+				{
+					Description: descVarSecret,
+					Confidence:  diagnostics.High},
+				{
+					Description: descHighEntropy,
+					Confidence:  diagnostics.Medium},
+			},
+		},
+		{
+			name:      "Assignment 2.2",
+			value:     `crypt space = "gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1"`,
+			extension: ".java",
+			provider:  assignmentProviderID,
+			evidences: [3]diagnostics.Evidence{
+				{
+					Description: descGithubToken,
+					Confidence:  diagnostics.High},
+				{
+					Description: descGithubToken,
+					Confidence:  diagnostics.High},
+				{
+					Description: descSecretUnbrokenString,
+					Confidence:  diagnostics.Medium},
+			},
+		},
+		{
+			name:            "Assignment 2.3",
+			value:           `crypt_with_space = "HbjZ!+{c]Y5! kNzB+-p^A6bCt(zNtf=V"`,
+			extension:       ".java",
+			shouldNotDetect: true,
 		},
 		{
 			name:      "Assignment 3",
@@ -79,7 +118,7 @@ func TestFindSecret(t *testing.T) {
 		},
 		{
 			name:      "JSON Assignment 1",
-			value:     `"Password": "This_is_A_{§pwd1"`,
+			value:     `"Pwd": "This_is_A_{§pwd1"`,
 			extension: ".json",
 			provider:  jsonAssignmentProviderID,
 			evidences: [3]diagnostics.Evidence{
@@ -94,26 +133,79 @@ func TestFindSecret(t *testing.T) {
 					Confidence:  diagnostics.Medium},
 			},
 		},
+		{
+			name:      "Github",
+			value:     `"gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1"`,
+			extension: ".xml",
+			provider:  assignmentProviderID,
+			evidences: [3]diagnostics.Evidence{
+				{
+					Description: descGithubToken,
+					Confidence:  diagnostics.High},
+				{
+					Description: descGithubToken,
+					Confidence:  diagnostics.High},
+				{
+					Description: descSecretUnbrokenString,
+					Confidence:  diagnostics.Medium},
+			},
+		},
+		{
+			name: "Assigned variable name with newline",
+			value: `
+IAuthUserRequest,
+  res: Response,
+  next
+) => {
+  req.user = { nickname: "test"
+`,
+			extension:       ".ts",
+			shouldNotDetect: true,
+			provider:        yamlAssignmentProviderID,
+		},
 	}
 
 	wl := diagnostics.MakeEmptyExcludes()
-	path := "" // dummy path
 	options := SecretSearchOptions{
 		Exclusions: wl,
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, options), false) {
+			// t.Errorf("%s, %t", tt.name, tt.isFP)
+			// t.Errorf("%s", tt.value)
+			path := fmt.Sprintf("Filename%s", tt.extension) // dummy path
+			gotResult := false
+			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, options), true) {
+				if tt.shouldNotDetect {
+					t.Errorf("Result Not expected, but Got %#v", got)
+				}
+				gotResult = true
 				want := makeDiagnostic(tt.value, tt.evidences, tt.provider)
-				if !reflect.DeepEqual(got.Justification, want.Justification) {
+				if !(got.Justification.Headline.Description == want.Justification.Headline.Description &&
+					got.Justification.Headline.Confidence == want.Justification.Headline.Confidence) &&
+					!checkEqual(want.Justification.Reasons, got.Justification.Reasons) {
 					g, _ := json.MarshalIndent(got, "", " ")
 					w, _ := json.MarshalIndent(want, "", " ")
 
 					t.Errorf("FindSecret() = %s, \n\n ========want===========\n %s", string(g), string(w))
 				}
 			}
+
+			if !gotResult && !tt.shouldNotDetect {
+				t.Errorf("Expected Result from %#v", tt)
+			}
+
 		})
 	}
+}
+
+func checkEqual(a, b []diagnostics.Evidence) bool {
+	for i, x := range a {
+		if x.Description != b[i].Description || x.Confidence != b[i].Confidence {
+			return false
+		}
+	}
+	return true
 }
 
 func makeDiagnostic(source string, evidences [3]diagnostics.Evidence, providerID string) diagnostics.SecurityDiagnostic {
