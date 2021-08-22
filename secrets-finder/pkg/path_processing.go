@@ -185,21 +185,19 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 			return
 		}
 
-		why = fmt.Sprintf("Warning! You may be sharing confidential (%s) data with your code", why)
+		evidence := checkConfidential(confidentialFile{
+			path: path,
+			why:  fmt.Sprintf("Warning! You may be sharing confidential (%s) data with your code", why),
+		})
+		// why = fmt.Sprintf("Warning! You may be sharing confidential (%s) data with your code", why)
 		issue := diagnostics.SecurityDiagnostic{
 			Location:   &path,
 			ProviderID: &confidentialFilesProviderID,
 			SHA256:     computeFileHash(cff.options.CalculateChecksum, path),
 			Justification: diagnostics.Justification{
-				Headline: diagnostics.Evidence{
-					Description: why,
-					Confidence:  diagnostics.Medium,
-				},
+				Headline: evidence,
 				Reasons: []diagnostics.Evidence{
-					{
-						Description: why,
-						Confidence:  diagnostics.Medium,
-					},
+					evidence,
 				},
 			},
 		}

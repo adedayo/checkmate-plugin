@@ -31,15 +31,15 @@ var (
 	descNotSecret                  = "Value does not appear to be a secret"
 	unusualPasswordStartCharacters = `<>&^%?#({|/`
 
-	assignmentProviderID     = "SecretAssignment"
-	confAssignmentProviderID = "ConfSecretAssignment"
-	cppAssignmentProviderID  = "CPPSecretAssignment"
-	longTagValueProviderID   = "LongOrSuspiciousSecretInXML"
-	xmlAssignmentProviderID  = "SecretAssignmentInXML"
-	secretTagProviderID      = "SuspiciousOrCommonSecretInXML"
-	jsonAssignmentProviderID = "JSONSecretAssignment"
-	yamlAssignmentProviderID = "YAMLSecretAssignment"
-	// arrowAssignmentProviderID     = "ArrowSecretAssignment"
+	assignmentProviderID          = "SecretAssignment"
+	confAssignmentProviderID      = "ConfSecretAssignment"
+	cppAssignmentProviderID       = "CPPSecretAssignment"
+	longTagValueProviderID        = "LongOrSuspiciousSecretInXML"
+	xmlAssignmentProviderID       = "SecretAssignmentInXML"
+	secretTagProviderID           = "SuspiciousOrCommonSecretInXML"
+	jsonAssignmentProviderID      = "JSONSecretAssignment"
+	yamlAssignmentProviderID      = "YAMLSecretAssignment"
+	arrowAssignmentProviderID     = "ArrowSecretAssignment"
 	defineAssignmentProviderID    = "DefineSecretAssignment"
 	tagAssignmentProviderID       = "ElementSecretAssignment"
 	attributeAssignmentProviderID = "AttributeSecretAssignment"
@@ -81,6 +81,8 @@ func defaultFinder(options SecretSearchOptions) MatchProvider {
 			makeSecretStringFinder(secretStringProviderID, secretStrings, options),
 			makeSecretStringFinder(longStringProviderID, longStrings, options),
 			makeAssignmentFinder(yamlAssignmentProviderID, yamlAssignment, options),
+			makeAssignmentFinder(arrowAssignmentProviderID, arrowQuoteLeft, options),
+			makeAssignmentFinder(arrowAssignmentProviderID, arrowNoQuoteLeft, options),
 		}...),
 	}
 }
@@ -532,22 +534,24 @@ func processXMLStrings(data string, sourceIndex int64, finder *xmlSecretFinder) 
 
 func processAssignment(match []int, providerID, source string, startIndex int64, sf secretFinder) {
 	if len(match) == 6 { //we are expecting 6 elements
-		// start := int64(match[0])
-		end := int64(match[1])
+		lhsStart := int64(match[2])
+		variable := strings.TrimSpace(strings.ToLower(source[lhsStart:match[3]]))
 
+		//check if variable contains newline or space => in which case it's most likely an FP
+		if strings.Contains(variable, "\n") || space.FindStringSubmatchIndex(variable) != nil {
+			return
+		}
+
+		end := int64(match[1])
 		rhsStart := int64(match[4]) //beginning of assigned value
 		assignedVal := source[rhsStart:end]
 		assignedVal, count := trimQuotes(assignedVal)
 		rhsStart += int64(count)
 		rhsEnd := rhsStart + int64(len(assignedVal))
-		evidence := detectSecret(assignedVal)
-		lhsStart := int64(match[2])
-		variable := strings.ToLower(source[lhsStart:match[3]])
+		evidence := detectSecret(secretContext{secret: assignedVal, higherConfidenceContext: true})
 
-		//check if variable contains newline => in which case it's most likely an FP
-		if strings.Contains(variable, "\n") {
-			return
-		}
+		// log.Printf("(%s) Variable: %s <=> %s\n", providerID, variable, assignedVal)
+		// log.Printf("(%s) Evidence: %#v \n", providerID, evidence)
 
 		if strings.Contains(variable, "passphrase") {
 			//special "passphrase" case:
@@ -590,7 +594,7 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 			Excluded:   sf.ShouldExcludeValue(assignedVal),
 			SHA256:     computeHash(sf.options.CalculateChecksum, assignedVal),
 		}
-		if diagnostic.Justification.Reasons[1].Confidence != diagnostics.Low {
+		if diagnostic.Justification.Reasons[1].Confidence > diagnostics.Low {
 			diagnostic.Justification.Headline.Confidence = diagnostics.High
 		}
 		if diagnostic.Justification.Reasons[1].Description == descNotSecret &&
@@ -621,7 +625,7 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 	stringStart := start + int64(count)
 	stringEnd := stringStart + int64(len(value))
 
-	evidence := detectSecret(value)
+	evidence := detectSecret(secretContext{secret: value})
 	if evidence.Description == descNotSecret && evidence.Confidence == diagnostics.High {
 		return //skip high confidence non-secrets
 	}
@@ -661,6 +665,12 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 	}
 	if diagnostic.Justification.Reasons[1].Confidence == diagnostics.High {
 		diagnostic.Justification.Headline.Confidence = diagnostics.High
+	}
+	//set the headline confidence to the lower confidence if we are dealing just with unbroken string
+	if diagnostic.Justification.Headline.Description == descSecretUnbrokenString &&
+		diagnostic.Justification.Reasons[1].Confidence < diagnostics.Medium {
+		diagnostic.Justification.Headline.Confidence = diagnostic.Justification.Reasons[1].Confidence
+
 	}
 	s := source[start:end]
 	if sf.provideSource {
@@ -708,6 +718,9 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 	}
 	variable = strings.ToLower(variable)
 	rawAssigned := assignedVal
+	assignedVal, _ = trimQuotes(assignedVal)
+	// stringStart := start + int64(count)
+	// stringEnd := stringStart + int64(len(assignedVal))
 	assignedVal = strings.TrimSpace(assignedVal)
 
 	if isElement && assignedVal == "" {
@@ -716,7 +729,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 		return
 	}
 	if secretVarCompile.MatchString(variable) {
-		evidence := detectSecret(assignedVal)
+		evidence := detectSecret(secretContext{secret: assignedVal, higherConfidenceContext: true})
 		if strings.Contains(variable, "passphrase") {
 			//special "passphrase" case:
 			//if the assigned variable is a passphrase bypass any result of the assigned value
@@ -757,7 +770,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 			Excluded:   finder.ShouldExcludeValue(assignedVal),
 			SHA256:     computeHash(finder.options.CalculateChecksum, assignedVal),
 		}
-		if diagnostic.Justification.Reasons[1].Confidence != diagnostics.Low {
+		if diagnostic.Justification.Reasons[1].Confidence > diagnostics.Low {
 			diagnostic.Justification.Headline.Confidence = diagnostics.High
 		}
 		if diagnostic.Justification.Reasons[1].Description == descNotSecret &&
@@ -772,7 +785,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 			buff := make([]byte, end-start+1)
 			scan.Seek(start, io.SeekStart)
 			scan.Read(buff)
-			s := string(buff)
+			s := fmt.Sprintf("%s>%s", variable, string(buff))
 			diagnostic.Source = &s
 		}
 		finder.Broadcast(&diagnostic)

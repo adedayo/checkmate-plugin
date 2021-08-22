@@ -37,7 +37,7 @@ var (
 
 	encodedSecretPatterns = []string{
 		`[a-z0-9+/]{0,8}[0-9][a-z0-9+/]{8,}={1,2}`, //Base64-like string
-		`[0-9a-fA-F]{16,}`,                         //Hex-like string
+		`[0-9a-fA-F-]{16,}`,                        //Hex-like string
 	}
 	commonSecretPatterns   = []string{`password\d?`, `change(?:it|me)`, `postgres`, `admin`, `root`, `qwerty`, `1234567?8?`, `111111`}
 	secretStringIndicators = setupSecretStringsIndicators()
@@ -47,10 +47,13 @@ var (
 	upperCase              = regexp.MustCompile(`[A-Z]`)
 	lowerCase              = regexp.MustCompile(`[a-z]`)
 	digit                  = regexp.MustCompile(`\d`)
+	numbers                = regexp.MustCompile(`^\d+$`)
 	space                  = regexp.MustCompile(`\s`)
 	special                = regexp.MustCompile(`["!\#$%&'()*+,-./:;<=>?@[\]^_{|}` + "`]")
 	longStrings            = regexp.MustCompile(fmt.Sprintf(`((?:%s){%d,})`, stringLikeValues, minSecretLength))
 	secretStrings          = regexp.MustCompile(fmt.Sprintf(`(%s%s(?i:%s)%s%s)`, quote, notQuote, secretStringIndicators, notQuote, quote))
+	//see https://datatracker.ietf.org/doc/html/rfc7468#section-4
+	certIdentifier = regexp.MustCompile(`-----BEGIN ([^-]+)-----`)
 	//e.g <x> pasword123 </x>
 	secretTagValues = regexp.MustCompile(fmt.Sprintf(`>\s*((?i:%s[^<]*))<`, secretStringIndicators))
 	longTagValues   = regexp.MustCompile(fmt.Sprintf(`>([^\s<]{%d,})<`, minSecretLength))

@@ -37,6 +37,7 @@ var (
 	}
 )
 
+//TODO: Make pre- and post-validating functions in addition to the regex. e.g. string must also contain numbers, upper/lowercases
 func makeVendorSecretsFinders(options SecretSearchOptions) (out []common.ResourceToSecurityDiagnostics) {
 
 	for id, re := range vendorSecrets {

@@ -1,7 +1,7 @@
 package secrets
 
 import (
-	"fmt"
+	"errors"
 	"math"
 	"strings"
 
@@ -12,16 +12,34 @@ var (
 	entropyCutoff = 0.8 //80% of maximum achievable entropy as a cutoff to determine if string is a secret
 )
 
-func detectSecret(secret string) (evidence diagnostics.Evidence) {
-	evidence.Description = descSuspiciousSecret
-	evidence.Confidence = diagnostics.Low
+type secretContext struct {
+	secret                  string
+	higherConfidenceContext bool //e.g. if secret string in a context such as password = "..."
+}
+
+func detectSecret(secContext secretContext) diagnostics.Evidence {
+	secret := secContext.secret
+
+	// log.Printf("Secret: %s", secret)
+	evidence := diagnostics.Evidence{
+		Description: descSuspiciousSecret,
+		Confidence:  diagnostics.Info,
+	}
+
+	if !secContext.higherConfidenceContext {
+		evidence.Description = descNotSecret
+		evidence.Confidence = diagnostics.High
+	}
+
 	secret = strings.TrimSpace(secret)
 	data := strings.ToLower(secret)
 	if data == "" ||
 		//secrets seldom start with http or urn:
 		strings.HasPrefix(data, "http") || strings.HasPrefix(data, "urn:") ||
-		//spaces are unusual to be found in passwords/secrets
-		space.FindStringSubmatchIndex(data) != nil ||
+		//the values true or false are unlikely to be secrets
+		data == "true" || data == "false" ||
+		//spaces are unusual to be found in passwords/secrets, exclude values that are only numbers but not longer than 16 characters
+		space.FindStringSubmatchIndex(data) != nil || (len(data) < 16 && numbers.MatchString(data)) ||
 		//anecdotal passwords in config don't typically start with these characters,
 		//and if it does but is longer than 45 characters, they probably are security-minded
 		//and will know not to put secrets in plaintext, so assume not a secret!
@@ -31,9 +49,19 @@ func detectSecret(secret string) (evidence diagnostics.Evidence) {
 	} else if description, isVendor := isVendorSecret(data); isVendor {
 		evidence.Description = description
 		evidence.Confidence = diagnostics.High
+
+		//some vendor secrets are critical
+		switch description {
+		case descGithubToken, descSlackToken, descGoCardlessToken, descStripeToken:
+			evidence.Confidence = diagnostics.Critical
+		}
 	} else if isCommonSecret(data) {
 		evidence.Description = descCommonSecret
-		evidence.Confidence = diagnostics.High
+		if validateSpecial(data) {
+			evidence.Confidence = diagnostics.High
+		} else {
+			evidence.Confidence = diagnostics.Medium
+		}
 	} else if length := float64(len(secret)); length > float64(minSecretLength) && length <= 256 &&
 		getShannonEntropy(secret) > entropyCutoff*math.Log2(length) && digit.FindStringSubmatchIndex(secret) != nil {
 		//for strings up to 64 characters in length, check that the entropy is at most half the maximum entropy possible for that data
@@ -48,9 +76,9 @@ func detectSecret(secret string) (evidence diagnostics.Evidence) {
 		evidence.Confidence = diagnostics.Medium
 	} else if validate(secret) {
 		evidence.Description = descSuspiciousSecret
-		evidence.Confidence = diagnostics.Medium
+		evidence.Confidence = diagnostics.Low
 	}
-	return
+	return evidence
 }
 
 func isVendorSecret(data string) (description string, isVendor bool) {
@@ -81,11 +109,7 @@ func isEncodedSecret(data string) bool {
 }
 
 func validateSpecial(data string) bool {
-	if len(data) >= minSecretLength && special.FindStringSubmatchIndex(data) != nil &&
-		upperCase.FindStringSubmatchIndex(data) != nil &&
-		lowerCase.FindStringSubmatchIndex(data) != nil &&
-		digit.FindStringSubmatchIndex(data) != nil &&
-		space.FindStringSubmatchIndex(data) == nil {
+	if special.FindStringSubmatchIndex(data) != nil && validate(data) {
 		return true
 	}
 	return false
@@ -127,7 +151,7 @@ func (s *stack) push(x string) {
 
 func (s *stack) pop() (out string, err error) {
 	if len(s.data) == 0 {
-		return "", fmt.Errorf("Popping an empty stack")
+		return "", errors.New("popping an empty stack")
 	}
 	index := len(s.data) - 1
 	out = s.data[index]
@@ -138,7 +162,7 @@ func (s *stack) pop() (out string, err error) {
 
 func (s *stack) peek() (out string, err error) {
 	if len(s.data) == 0 {
-		return "", fmt.Errorf("Peeking an empty stack")
+		return "", errors.New("peeking an empty stack")
 	}
 	index := len(s.data) - 1
 	out = s.data[index]

@@ -26,6 +26,11 @@ func TestFindSecret(t *testing.T) {
 		shouldNotDetect bool //test FPs
 	}{
 		{
+			name:      "Empty arrow",
+			value:     `dkim-signature'         => `,
+			extension: ".php",
+		},
+		{
 			name:      "Assignment 1",
 			value:     `pwd = "232d222x2324c2ecc2c2e"`,
 			extension: ".java",
@@ -38,8 +43,8 @@ func TestFindSecret(t *testing.T) {
 					Description: descVarSecret,
 					Confidence:  diagnostics.High},
 				{
-					Description: descNotSecret,
-					Confidence:  diagnostics.Low},
+					Description: descSuspiciousSecret,
+					Confidence:  diagnostics.Info},
 			},
 		},
 		{
@@ -163,6 +168,20 @@ IAuthUserRequest,
 			shouldNotDetect: true,
 			provider:        yamlAssignmentProviderID,
 		},
+
+		{
+			name:            "key with unusual value assignement",
+			value:           `key: TaggingAction.FALSE_POSITIVE_DOMAIN.key };`,
+			extension:       ".ts",
+			shouldNotDetect: true,
+		},
+
+		{
+			name:            "Numbers should not be picked up",
+			value:           `key: "97654247905442"`,
+			extension:       ".js",
+			shouldNotDetect: true,
+		},
 	}
 
 	wl := diagnostics.MakeEmptyExcludes()
@@ -171,8 +190,6 @@ IAuthUserRequest,
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// t.Errorf("%s, %t", tt.name, tt.isFP)
-			// t.Errorf("%s", tt.value)
 			path := fmt.Sprintf("Filename%s", tt.extension) // dummy path
 			gotResult := false
 			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, options), true) {

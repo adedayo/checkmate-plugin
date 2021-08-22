@@ -14,6 +14,13 @@ func Test_detectSecret(t *testing.T) {
 		wantEvidence diagnostics.Evidence
 	}{
 		{
+			name:   "numbers only should not be detected",
+			secret: `56987654123456`,
+			wantEvidence: diagnostics.Evidence{
+				Description: descNotSecret,
+				Confidence:  diagnostics.High},
+		},
+		{
 			name:   "SpecialCharacter",
 			secret: "Ca`snn1djsrrddsd*",
 			wantEvidence: diagnostics.Evidence{
@@ -110,7 +117,7 @@ func Test_detectSecret(t *testing.T) {
 			secret: "password1",
 			wantEvidence: diagnostics.Evidence{
 				Description: descCommonSecret,
-				Confidence:  diagnostics.High},
+				Confidence:  diagnostics.Medium},
 		},
 		{
 			name:   "Not Secret",
@@ -129,7 +136,7 @@ func Test_detectSecret(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotEvidence := detectSecret(tt.secret); !reflect.DeepEqual(gotEvidence, tt.wantEvidence) {
+			if gotEvidence := detectSecret(secretContext{secret: tt.secret}); !reflect.DeepEqual(gotEvidence, tt.wantEvidence) {
 				t.Errorf("detectSecret() = %v, want %v", gotEvidence, tt.wantEvidence)
 			}
 		})
