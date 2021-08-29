@@ -26,6 +26,11 @@ func TestFindSecret(t *testing.T) {
 		shouldNotDetect bool //test FPs
 	}{
 		{
+			name:      "PHP arrow",
+			value:     `secret' => env('MANDRILL_SECRET'),\n`,
+			extension: ".php",
+		},
+		{
 			name:      "Empty arrow",
 			value:     `dkim-signature'         => `,
 			extension: ".php",
@@ -89,10 +94,10 @@ func TestFindSecret(t *testing.T) {
 			evidences: [3]diagnostics.Evidence{
 				{
 					Description: descGithubToken,
-					Confidence:  diagnostics.High},
+					Confidence:  diagnostics.Critical},
 				{
 					Description: descGithubToken,
-					Confidence:  diagnostics.High},
+					Confidence:  diagnostics.Critical},
 				{
 					Description: descSecretUnbrokenString,
 					Confidence:  diagnostics.Medium},
@@ -146,10 +151,10 @@ func TestFindSecret(t *testing.T) {
 			evidences: [3]diagnostics.Evidence{
 				{
 					Description: descGithubToken,
-					Confidence:  diagnostics.High},
+					Confidence:  diagnostics.Critical},
 				{
 					Description: descGithubToken,
-					Confidence:  diagnostics.High},
+					Confidence:  diagnostics.Critical},
 				{
 					Description: descSecretUnbrokenString,
 					Confidence:  diagnostics.Medium},

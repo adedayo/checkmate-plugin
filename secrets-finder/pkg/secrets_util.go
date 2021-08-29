@@ -33,11 +33,9 @@ func detectSecret(secContext secretContext) diagnostics.Evidence {
 
 	secret = strings.TrimSpace(secret)
 	data := strings.ToLower(secret)
-	if data == "" ||
-		//secrets seldom start with http or urn:
-		strings.HasPrefix(data, "http") || strings.HasPrefix(data, "urn:") ||
-		//the values true or false are unlikely to be secrets
-		data == "true" || data == "false" ||
+	if data == "true" || data == "false" || data == "" || //the values true or false are unlikely to be secrets
+		//secrets seldom start with http or urn (but exclude the connection URI scenario that contains @):
+		(strings.HasPrefix(data, "http") || strings.HasPrefix(data, "urn:")) && !strings.Contains(data, "@") ||
 		//spaces are unusual to be found in passwords/secrets, exclude values that are only numbers but not longer than 16 characters
 		space.FindStringSubmatchIndex(data) != nil || (len(data) < 16 && numbers.MatchString(data)) ||
 		//anecdotal passwords in config don't typically start with these characters,
@@ -54,6 +52,8 @@ func detectSecret(secContext secretContext) diagnostics.Evidence {
 		switch description {
 		case descGithubToken, descSlackToken, descGoCardlessToken, descStripeToken:
 			evidence.Confidence = diagnostics.Critical
+		case descConnectionURI:
+			evidence.Description = refineConnectURIDetection(data)
 		}
 	} else if isCommonSecret(data) {
 		evidence.Description = descCommonSecret

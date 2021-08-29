@@ -14,6 +14,13 @@ func Test_detectSecret(t *testing.T) {
 		wantEvidence diagnostics.Evidence
 	}{
 		{
+			name:   "mongo",
+			secret: `mongodb://mongouser:mongopwd@mongoserver.com:123456/path`,
+			wantEvidence: diagnostics.Evidence{
+				Description: "MongoDB Database " + descConnectionURI,
+				Confidence:  diagnostics.High},
+		},
+		{
 			name:   "numbers only should not be detected",
 			secret: `56987654123456`,
 			wantEvidence: diagnostics.Evidence{
@@ -88,28 +95,28 @@ func Test_detectSecret(t *testing.T) {
 			secret: "gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1",
 			wantEvidence: diagnostics.Evidence{
 				Description: descGithubToken,
-				Confidence:  diagnostics.High},
+				Confidence:  diagnostics.Critical},
 		},
 		{
 			name:   "Slack Token",
 			secret: "xoxb-333649436676-799261852869-clFJVVIaoJahpORboa3Ba2al",
 			wantEvidence: diagnostics.Evidence{
 				Description: descSlackToken,
-				Confidence:  diagnostics.High},
+				Confidence:  diagnostics.Critical},
 		},
 		{
 			name:   "Stripe Token",
 			secret: "sk_test_26PHem9AhJZvU623DfE1x4sd",
 			wantEvidence: diagnostics.Evidence{
 				Description: descStripeToken,
-				Confidence:  diagnostics.High},
+				Confidence:  diagnostics.Critical},
 		},
 		{
 			name:   "GoCardless Token",
 			secret: "live_y7VPTOdgFZtFaAS9V8HT3",
 			wantEvidence: diagnostics.Evidence{
 				Description: descGoCardlessToken,
-				Confidence:  diagnostics.High},
+				Confidence:  diagnostics.Critical},
 		},
 
 		{

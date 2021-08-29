@@ -30,7 +30,15 @@ func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.P
 		return //no such scan confguration
 	}
 
-	if excl, err := diagnostics.CompileExcludes(&scanConfig.Policy); err == nil {
+	container := diagnostics.ExcludeContainer{
+		ExcludeDef: &scanConfig.Policy,
+	}
+
+	for _, loc := range proj.Repositories {
+		container.Repositories = append(container.Repositories, loc.Location)
+	}
+
+	if excl, err := diagnostics.CompileExcludes(container); err == nil {
 		scanner.options.Exclusions = excl
 	}
 
@@ -47,7 +55,7 @@ func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.P
 	for _, path := range repositories {
 		paths = append(paths, path)
 	}
-	//reverse map local paths to git URLs
+	//reverse map local (temporary code checkout) paths to git URLs
 	repoMapper := make(map[string]string)
 	for repo, loc := range repositories {
 		repoMapper[loc] = repo

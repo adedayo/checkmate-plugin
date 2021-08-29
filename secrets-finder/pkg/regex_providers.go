@@ -503,7 +503,7 @@ func findElementOffset(file io.ReadSeeker, offset int64, element string) int64 {
 	if length == 0 {           //degenerate case
 		return offset
 	}
-	maxReverseDistance := 1024 // beyond which we will give up
+	maxReverseDistance := 10240 // beyond which we will give up
 	stopString := fmt.Sprintf("<%s", element)
 	for traversed := length; traversed <= maxReverseDistance; traversed += length {
 		buff := make([]byte, traversed)
@@ -543,6 +543,10 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 		}
 
 		end := int64(match[1])
+		s := source[lhsStart:end]
+		if sf.ShouldExcludeValue(s) {
+			return
+		}
 		rhsStart := int64(match[4]) //beginning of assigned value
 		assignedVal := source[rhsStart:end]
 		assignedVal, count := trimQuotes(assignedVal)
@@ -601,13 +605,13 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 			diagnostic.Justification.Headline.Confidence > diagnostics.Medium {
 			diagnostic.Justification.Headline.Confidence = diagnostics.Medium
 		}
-		s := source[lhsStart:end]
+
 		if sf.provideSource {
 			diagnostic.Source = &s
 		}
-		if !sf.ShouldExcludeValue(s) {
-			sf.Broadcast(&diagnostic)
-		}
+
+		sf.Broadcast(&diagnostic)
+
 	}
 }
 
@@ -620,6 +624,10 @@ func (a byConfidence) Less(i, j int) bool { return a[i].Confidence > a[j].Confid
 func processString(match []int, providerID, source string, startIndex int64, sf secretFinder) {
 	start := int64(match[0])
 	end := int64(match[1])
+	s := source[start:end]
+	if sf.ShouldExcludeValue(s) {
+		return
+	}
 	value := source[start:end]
 	value, count := trimQuotes(value)
 	stringStart := start + int64(count)
@@ -672,13 +680,11 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 		diagnostic.Justification.Headline.Confidence = diagnostic.Justification.Reasons[1].Confidence
 
 	}
-	s := source[start:end]
+
 	if sf.provideSource {
 		diagnostic.Source = &s
 	}
-	if !sf.ShouldExcludeValue(s) {
-		sf.Broadcast(&diagnostic)
-	}
+	sf.Broadcast(&diagnostic)
 }
 
 func findXMLStringSecret(source string, startIndex int64, providerID string, re *regexp.Regexp, sf *xmlSecretFinder) {
@@ -714,7 +720,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 	start := sourceIndex - int64(1) //peg the startindex back by 1 char
 	end := start + int64(len(assignedVal))
 	if !isElement {
-		end = sourceIndex + int64(len(variable)+len(assignedVal)+3) // 3 chars to account for = and ""
+		end = start + int64(len(variable)+len(assignedVal)+3) // 3 chars to account for = and ""
 	}
 	variable = strings.ToLower(variable)
 	rawAssigned := assignedVal
@@ -785,7 +791,7 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 			buff := make([]byte, end-start+1)
 			scan.Seek(start, io.SeekStart)
 			scan.Read(buff)
-			s := fmt.Sprintf("%s>%s", variable, string(buff))
+			s := fmt.Sprintf("%s", string(buff))
 			diagnostic.Source = &s
 		}
 		finder.Broadcast(&diagnostic)

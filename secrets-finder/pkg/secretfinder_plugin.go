@@ -30,7 +30,11 @@ func (sfp *FinderPlugin) GetPluginMetadata() (*pb.PluginMetadata, error) {
 //Scan runs the static analysis scan to find secrets in code and configuration files
 func (sfp *FinderPlugin) Scan(req *pb.ScanRequest, stream pb.PluginService_ScanServer) error {
 
-	wl, err := diagnostics.CompileExcludes(model.ConvertExcludeDefinition(req.Excludes))
+	container := diagnostics.ExcludeContainer{
+		ExcludeDef: model.ConvertExcludeDefinition(req.Excludes),
+		Repositories:/**empty repository locations*/ []string{},
+	}
+	wl, err := diagnostics.CompileExcludes(container)
 	if err != nil {
 		return err
 	}
