@@ -68,8 +68,8 @@ func detectSecret(secContext secretContext) diagnostics.Evidence {
 		//also check that there is at least a number in the secret
 		evidence.Description = descHighEntropy
 		evidence.Confidence = diagnostics.Medium
-	} else if isEncodedSecret(data) {
-		evidence.Description = descEncodedSecret
+	} else if desc, isEncoded := isEncodedSecret(data); isEncoded {
+		evidence.Description = desc
 		evidence.Confidence = diagnostics.High
 	} else if validateSpecial(secret) {
 		evidence.Description = descSuspiciousSecret
@@ -99,13 +99,23 @@ func isCommonSecret(data string) bool {
 	}
 	return false
 }
-func isEncodedSecret(data string) bool {
-	for _, re := range encodedSecrets {
+
+//TODO: Decode and scan Base64 Strings
+func isEncodedSecret(data string) (description string, isEncoded bool) {
+	description = descEncodedSecret
+	for ind, re := range encodedSecrets {
 		if re.MatchString(data) {
-			return true
+			switch ind {
+			case `base64`:
+				return description, true
+			case `hex`:
+				return description, true
+			default:
+				return description, true
+			}
 		}
 	}
-	return false
+	return description, false
 }
 
 func validateSpecial(data string) bool {
@@ -114,6 +124,7 @@ func validateSpecial(data string) bool {
 	}
 	return false
 }
+
 func validate(data string) bool {
 	if length := len(data); length >= minSecretLength && length <= 256 &&
 		upperCase.FindStringSubmatchIndex(data) != nil &&

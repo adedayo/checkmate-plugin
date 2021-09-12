@@ -35,14 +35,22 @@ var (
 	arrowNoQuoteLeft        = regexp.MustCompile(fmt.Sprintf(`(?U:\s*%s\s*=>\s*(%s|[^\n]*\n))`, secretVar, stringLikeValues))
 	// arrowAssignment = regexp.MustCompile(fmt.Sprintf(`(?U:%s?\s*%s\s*%s?\s*=>\s*(%s|[^\n]*\n))`, quote, secretVar, quote, quotedString))
 
-	encodedSecretPatterns = []string{
-		`[a-z0-9+/]{0,8}[0-9][a-z0-9+/]{8,}={1,2}`, //Base64-like string
-		`[0-9a-fA-F-]{16,}`,                        //Hex-like string
+	// encodedSecretPatterns = []string{
+	// 	`[a-z0-9+/]{0,8}[0-9][a-z0-9+/]{8,}={1,2}`, //Base64-like string
+	// 	`[0-9a-fA-F-]{16,}`,                        //Hex-like string
+	// }
+
+	encodedSecretPatterns = []string{}
+
+	indexedEncodedSecretPatterns = map[string]string{
+		// `base64`: `(?:[a-zA-Z0-9+/]{4}){2,}(?:[a-zA-Z0-9+/]{4}|[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)`, //Base64-like string
+		`base64`: `[a-zA-Z0-9+/]{0,8}[0-9][a-zA-Z0-9+/]{8,}={1,2}`, //Base64-like string
+		`hex`:    `[0-9a-fA-F-]{16,}`,                              //Hex-like string
 	}
 	commonSecretPatterns   = []string{`password\d?`, `change(?:it|me)`, `postgres`, `admin`, `root`, `qwerty`, `1234567?8?`, `111111`}
 	secretStringIndicators = setupSecretStringsIndicators()
 	commonSecrets          = []*regexp.Regexp{}
-	encodedSecrets         = []*regexp.Regexp{}
+	encodedSecrets         = map[string]*regexp.Regexp{}
 	vendorSecrets          = map[string]*regexp.Regexp{}
 	upperCase              = regexp.MustCompile(`[A-Z]`)
 	lowerCase              = regexp.MustCompile(`[a-z]`)
@@ -76,8 +84,8 @@ func setupCommonSecrets() {
 }
 
 func setupEncodedSecrets() {
-	for _, sec := range encodedSecretPatterns {
-		encodedSecrets = append(encodedSecrets, regexp.MustCompile(sec))
+	for ind, sec := range indexedEncodedSecretPatterns {
+		encodedSecrets[ind] = regexp.MustCompile(sec)
 	}
 }
 
@@ -88,6 +96,9 @@ func setupVendorSecrets() {
 }
 
 func setupSecretStringsIndicators() string {
+	for _, v := range indexedEncodedSecretPatterns {
+		encodedSecretPatterns = append(encodedSecretPatterns, v)
+	}
 	indicators := []string{}
 	indicators = append(indicators, commonSecretPatterns...)
 	indicators = append(indicators, encodedSecretPatterns...)

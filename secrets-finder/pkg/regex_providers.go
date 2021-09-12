@@ -147,14 +147,14 @@ func (dmp defaultMatchProvider) GetFinders() []common.ResourceToSecurityDiagnost
 	return dmp.finders
 }
 
-func (dmp defaultMatchProvider) ShouldExclude(pathContext, value string) bool {
-	for _, finder := range dmp.GetFinders() {
-		if finder.ShouldExclude(pathContext, value) {
-			return true
-		}
-	}
-	return false
-}
+// func (dmp defaultMatchProvider) ShouldExclude(pathContext, value string) bool {
+// 	for _, finder := range dmp.GetFinders() {
+// 		if finder.ShouldExclude(pathContext, value) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 //NewConfigurationSecretsFinder is a `MatchProvider` for finding secrets in configuration `.conf` files
 func NewConfigurationSecretsFinder(options SecretSearchOptions) MatchProvider {
@@ -543,7 +543,11 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 		}
 
 		end := int64(match[1])
-		s := source[lhsStart:end]
+		start2 := lhsStart
+		if start2 > 0 {
+			start2 -= 1
+		}
+		s := source[start2:end]
 		if sf.ShouldExcludeValue(s) {
 			return
 		}
@@ -610,7 +614,9 @@ func processAssignment(match []int, providerID, source string, startIndex int64,
 			diagnostic.Source = &s
 		}
 
-		sf.Broadcast(&diagnostic)
+		if !(sf.options.CalculateChecksum && sf.ShouldExcludeHash(*diagnostic.SHA256)) {
+			sf.Broadcast(&diagnostic)
+		}
 
 	}
 }
@@ -684,7 +690,10 @@ func processString(match []int, providerID, source string, startIndex int64, sf 
 	if sf.provideSource {
 		diagnostic.Source = &s
 	}
-	sf.Broadcast(&diagnostic)
+	if !(sf.options.CalculateChecksum && sf.ShouldExcludeHash(*diagnostic.SHA256)) {
+		sf.Broadcast(&diagnostic)
+	}
+
 }
 
 func findXMLStringSecret(source string, startIndex int64, providerID string, re *regexp.Regexp, sf *xmlSecretFinder) {
@@ -791,10 +800,13 @@ func processXMLAssignment(variable, assignedVal string, sourceIndex int64, isEle
 			buff := make([]byte, end-start+1)
 			scan.Seek(start, io.SeekStart)
 			scan.Read(buff)
-			s := fmt.Sprintf("%s", string(buff))
+			s := string(buff)
 			diagnostic.Source = &s
 		}
-		finder.Broadcast(&diagnostic)
+		if !(finder.options.CalculateChecksum && finder.ShouldExcludeHash(*diagnostic.SHA256)) {
+			finder.Broadcast(&diagnostic)
+		}
+
 	} else {
 		//deal with case where element or attribute name does not suggest value is a secret
 		processXMLStrings(rawAssigned, sourceIndex, finder)

@@ -190,10 +190,11 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 			why:  fmt.Sprintf("Warning! You may be sharing confidential (%s) data with your code", why),
 		})
 		// why = fmt.Sprintf("Warning! You may be sharing confidential (%s) data with your code", why)
+		hash := computeFileHash(cff.options.CalculateChecksum, path)
 		issue := diagnostics.SecurityDiagnostic{
 			Location:   &path,
 			ProviderID: &confidentialFilesProviderID,
-			SHA256:     computeFileHash(cff.options.CalculateChecksum, path),
+			SHA256:     hash,
 			Justification: diagnostics.Justification{
 				Headline: evidence,
 				Reasons: []diagnostics.Evidence{
@@ -207,7 +208,10 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 		if confidential {
 			issue.AddTag("confidential")
 		}
-		cff.Broadcast(&issue)
+
+		if hash != nil && !cff.ShouldExcludeHash(*hash) {
+			cff.Broadcast(&issue)
+		}
 	}
 }
 
@@ -327,7 +331,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 				}
 
 				val := issue.GetValue()
-				if !pathBSF.ShouldExclude(path, val) {
+				if !(pathBSF.ShouldExclude(path, val) || (issue.SHA256 != nil && pathBSF.ShouldExcludeHashOnPath(path, *issue.SHA256))) {
 					pathBSF.Broadcast(issue)
 				}
 			}

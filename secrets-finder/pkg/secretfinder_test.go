@@ -27,12 +27,12 @@ func TestFindSecret(t *testing.T) {
 	}{
 		{
 			name:      "PHP arrow",
-			value:     `secret' => env('MANDRILL_SECRET'),\n`,
+			value:     `'secret' => env('MANDRILL_SECRET'),\n`,
 			extension: ".php",
 		},
 		{
 			name:      "Empty arrow",
-			value:     `dkim-signature'         => `,
+			value:     `'dkim-signature'         => `,
 			extension: ".php",
 		},
 		{
