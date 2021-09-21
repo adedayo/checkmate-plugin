@@ -68,7 +68,8 @@ var (
 	// longUnbrokenValue = regexp.MustCompile(fmt.Sprintf(`([^\s]{%d,}\s)`, minSecretLength))
 	secretTags = regexp.MustCompile(fmt.Sprintf(`<\s*%s\s*>([^<]*)<`, secretVar))
 
-	testFile = regexp.MustCompile(`(?i:.*/(?:tests?/.*|[^/]*test[^/]*)$)`) //match files with /test/ or /tests/ in the path or with test in the filename
+	// testFile = regexp.MustCompile(`(?i:.*/(?:tests?/.*|[^/]*test[^/]*)$)`) //match files with /test/ or /tests/ in the path or with test in the filename
+	testFile = regexp.MustCompile(`(?i:.*test.*)`) //match paths that contain the word test anywhere
 )
 
 func init() {
