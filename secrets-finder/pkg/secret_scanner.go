@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"log"
 	"os"
 	"strings"
@@ -16,7 +17,7 @@ type SecretScanner struct {
 	options SecretSearchOptions
 }
 
-func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.ProjectManager,
+func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID string, pm projects.ProjectManager,
 	progressCallback func(diagnostics.Progress), consumers ...diagnostics.SecurityDiagnosticsConsumer) {
 
 	//ensure project and scan config exist
@@ -50,7 +51,7 @@ func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.P
 
 	//get paths and check out repositories as may be necessary
 	repos := proj.Repositories
-	repositories, local := cloneRepositories(repos)
+	repositories, local := cloneRepositories(ctx, repos)
 	paths := local
 	for _, path := range repositories {
 		paths = append(paths, path)
@@ -126,11 +127,11 @@ func (scanner SecretScanner) Scan(projectID string, scanID string, pm projects.P
 	}
 
 	//3. cleanup: delete checked out repositories
-	// if !proj.KeepCheckedOutCode {
-	for _, r := range repositories {
-		os.RemoveAll(r)
+	if proj.DeleteCheckedOutCode {
+		for _, r := range repositories {
+			os.RemoveAll(r)
+		}
 	}
-	// }
 }
 
 func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
@@ -141,20 +142,26 @@ func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
 
 //cloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 //and the second argument are non-git local paths
-func cloneRepositories(repo []projects.Repository) (map[string]string, []string) {
+func cloneRepositories(ctx context.Context, repositories []projects.Repository) (map[string]string, []string) {
 	repoMap := make(map[string]string)
 	local := []string{}
-	for _, p := range repo {
+	gitConfig := gitutils.MakeConfigManager().GetConfig()
+	for _, p := range repositories {
 		switch p.LocationType {
 		case "filesystem":
 			local = append(local, p.Location)
 		case "git":
 			if _, present := repoMap[p.Location]; !present {
-				if repo, err := gitutils.Clone(p.Location); err == nil {
+				options := &gitutils.GitCloneOptions{BaseDir: gitutils.DEFAULT_CLONE_BASE_DIR}
+				if service, err := gitConfig.FindService(p.GitServiceID); err == nil {
+					options.Auth = service.MakeAuth()
+				}
+				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
 					repoMap[p.Location] = repo
 				} else {
 					log.Printf("%v", err)
 				}
+
 			}
 		default:
 			//ignore any other types of repos

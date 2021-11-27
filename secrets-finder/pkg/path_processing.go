@@ -12,7 +12,6 @@ import (
 	common "github.com/adedayo/checkmate-core/pkg"
 	"github.com/adedayo/checkmate-core/pkg/diagnostics"
 	gitutils "github.com/adedayo/checkmate-core/pkg/git"
-	"github.com/adedayo/checkmate-core/pkg/util"
 )
 
 var (
@@ -21,83 +20,6 @@ var (
 	gitURL                          = regexp.MustCompile(`\s*(?i:https?://|git@).*`)
 	TenMB                           = int64(1024 * 1000 * 10) // 10Mb
 )
-
-//SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
-//Streams back security diagnostics and paths
-func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *diagnostics.SecurityDiagnostic, chan []string) {
-	out := make(chan *diagnostics.SecurityDiagnostic)
-	pathsOut := make(chan []string)
-	repositories, local := determineAndCloneRepositories(paths)
-	paths = local
-	for _, path := range repositories {
-		paths = append(paths, path)
-	}
-	//reverse map local paths to git URLs
-	repoMapper := make(map[string]string)
-	for repo, loc := range repositories {
-		repoMapper[loc] = repo
-	}
-	collector := func(diagnostic *diagnostics.SecurityDiagnostic) {
-		location := *diagnostic.Location
-		for loc, repo := range repoMapper {
-			location = strings.Replace(location, loc, repo, 1)
-		}
-		diagnostic.Location = &location
-		if repo, present := repoMapper[*diagnostic.Location]; present {
-			diagnostic.Location = &repo
-		}
-		out <- diagnostic
-	}
-
-	var pathConsumers []util.PathConsumer
-	if options.ConfidentialFilesOnly {
-		pathConsumers = []util.PathConsumer{
-			&confidentialFilesFinder{
-				ExclusionProvider: options.Exclusions,
-				options:           options,
-			},
-		}
-	} else {
-		pathConsumers = []util.PathConsumer{
-			&confidentialFilesFinder{
-				ExclusionProvider: options.Exclusions,
-				options:           options,
-			},
-			&pathBasedSourceSecretFinder{
-				showSource:        options.ShowSource,
-				ExclusionProvider: options.Exclusions,
-				options:           options,
-			},
-		}
-
-	}
-	providers := []diagnostics.SecurityDiagnosticsProvider{}
-	for _, c := range pathConsumers {
-		providers = append(providers, c.(diagnostics.SecurityDiagnosticsProvider))
-	}
-	common.RegisterDiagnosticsConsumer(collector, providers...)
-
-	mux := util.NewPathMultiplexer(pathConsumers...)
-
-	go func() {
-		allFiles := []string{}
-		defer func() {
-			//clean downloaded repositories
-			for _, r := range repositories {
-				os.RemoveAll(r)
-			}
-			close(out)
-			pathsOut <- allFiles
-			close(pathsOut)
-		}()
-		allFiles = util.FindFiles(paths)
-		for _, path := range allFiles {
-			mux.ConsumePath(path)
-		}
-	}()
-
-	return out, pathsOut
-}
 
 //determineAndCloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 //and the second argument are non-git local paths
@@ -109,7 +31,7 @@ func determineAndCloneRepositories(paths []string) (map[string]string, []string)
 			local = append(local, p)
 		} else {
 			if _, present := repoMap[p]; !present {
-				if repo, err := gitutils.Clone(p); err == nil {
+				if repo, err := gitutils.CloneOld(p); err == nil {
 					repoMap[p] = repo
 				}
 			}
