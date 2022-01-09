@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	common "github.com/adedayo/checkmate-core/pkg"
@@ -51,7 +52,7 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 
 	//get paths and check out repositories as may be necessary
 	repos := proj.Repositories
-	repositories, local := cloneRepositories(ctx, repos)
+	repositories, local := cloneRepositories(ctx, repos, pm.GetBaseDir())
 	paths := local
 	for _, path := range repositories {
 		paths = append(paths, path)
@@ -142,17 +143,17 @@ func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
 
 //cloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 //and the second argument are non-git local paths
-func cloneRepositories(ctx context.Context, repositories []projects.Repository) (map[string]string, []string) {
+func cloneRepositories(ctx context.Context, repositories []projects.Repository, checkMateBaseDir string) (map[string]string, []string) {
 	repoMap := make(map[string]string)
 	local := []string{}
-	gitConfig := gitutils.MakeConfigManager().GetConfig()
+	gitConfig := gitutils.MakeConfigManager(checkMateBaseDir).GetConfig()
 	for _, p := range repositories {
 		switch p.LocationType {
 		case "filesystem":
 			local = append(local, p.Location)
 		case "git":
 			if _, present := repoMap[p.Location]; !present {
-				options := &gitutils.GitCloneOptions{BaseDir: gitutils.DEFAULT_CLONE_BASE_DIR}
+				options := &gitutils.GitCloneOptions{BaseDir: path.Join(checkMateBaseDir, "code")}
 				if service, err := gitConfig.FindService(p.GitServiceID); err == nil {
 					options.Auth = service.MakeAuth()
 				}
