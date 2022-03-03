@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,7 +32,7 @@ func determineAndCloneRepositories(paths []string) (map[string]string, []string)
 			local = append(local, p)
 		} else {
 			if _, present := repoMap[p]; !present {
-				if repo, err := gitutils.CloneOld(p); err == nil {
+				if repo, err := gitutils.Clone(context.Background(), p, &gitutils.GitCloneOptions{}); err == nil {
 					repoMap[p] = repo
 				}
 			}
