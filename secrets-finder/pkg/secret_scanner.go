@@ -22,14 +22,14 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	progressCallback func(diagnostics.Progress), consumers ...diagnostics.SecurityDiagnosticsConsumer) {
 
 	//ensure project and scan config exist
-	proj := pm.GetProject(projectID)
-	if proj.ID != projectID {
+	proj, err := pm.GetProject(projectID)
+	if err != nil {
 		return // no such project
 	}
 
-	scanConfig := pm.GetScanConfig(projectID, scanID)
-	if scanConfig.ID == "" {
-		return //no such scan confguration
+	scanConfig, err := pm.GetScanConfig(projectID, scanID)
+	if err != nil {
+		return //no such scan configuration
 	}
 
 	container := diagnostics.ExcludeContainer{
@@ -51,29 +51,39 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	}
 
 	//get paths and check out repositories as may be necessary
-	repos := proj.Repositories
-	repositories, local := cloneRepositories(ctx, repos, pm.GetBaseDir())
+	repositories, local := cloneRepositories(ctx, &proj, pm)
 	paths := local
-	for _, path := range repositories {
-		paths = append(paths, path)
-	}
 	//reverse map local (temporary code checkout) paths to git URLs
 	repoMapper := make(map[string]string)
-	for repo, loc := range repositories {
-		repoMapper[loc] = repo
+	for repo, path := range repositories {
+		paths = append(paths, path)
+		repoMapper[path] = repo
+	}
+
+	transposePath := func(location string) string {
+		for localPath, repo := range repoMapper {
+			location = strings.Replace(location, localPath, repo, 1)
+		}
+
+		if repo, present := repoMapper[location]; present {
+			return repo
+		}
+		return location
 	}
 
 	//a diagnostics collect function that fixes location for git repositories
 	//and multiplexes the diagnostic to all provided diagnostic consumers
 	transposePathsToRepoBaseDiagnosticConsumer := func(diagnostic *diagnostics.SecurityDiagnostic) {
-		location := *diagnostic.Location
-		for loc, repo := range repoMapper {
-			location = strings.Replace(location, loc, repo, 1)
-		}
-		diagnostic.Location = &location
-		if repo, present := repoMapper[*diagnostic.Location]; present {
-			diagnostic.Location = &repo
-		}
+		// location := *diagnostic.Location
+		// for loc, repo := range repoMapper {
+		// 	location = strings.Replace(location, loc, repo, 1)
+		// }
+		// diagnostic.Location = &location
+		// if repo, present := repoMapper[*diagnostic.Location]; present {
+		// 	diagnostic.Location = &repo
+		// }
+		loc := transposePath(*diagnostic.Location)
+		diagnostic.Location = &loc
 		for _, consumer := range consumers {
 			consumer.ReceiveDiagnostic(diagnostic)
 		}
@@ -119,7 +129,7 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 		progress := diagnostics.Progress{
 			ProjectID:   projectID,
 			ScanID:      scanID,
-			CurrentFile: path, //TODO transpose path
+			CurrentFile: transposePath(path),
 			Position:    int64(index + 1),
 			Total:       int64(fileCount),
 		}
@@ -143,17 +153,28 @@ func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
 
 //cloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 //and the second argument are non-git local paths
-func cloneRepositories(ctx context.Context, repositories []projects.Repository, checkMateBaseDir string) (map[string]string, []string) {
+func cloneRepositories(ctx context.Context, project *projects.Project, pm projects.ProjectManager) (map[string]string, []string) {
+
 	repoMap := make(map[string]string)
 	local := []string{}
-	gitConfig := gitutils.MakeConfigManager(checkMateBaseDir).GetConfig()
+	repositories := project.Repositories
+	gitConfig := &gitutils.GitServiceConfig{
+		GitServices: make(map[gitutils.GitServiceType]map[string]*gitutils.GitService),
+	}
+
+	confManager, err := gitutils.NewDBGitConfigManager(pm.GetBaseDir())
+	if err == nil {
+		if conf, err := confManager.GetConfig(); err == nil {
+			gitConfig = conf
+		}
+	}
 	for _, p := range repositories {
 		switch p.LocationType {
 		case "filesystem":
 			local = append(local, p.Location)
 		case "git":
 			if _, present := repoMap[p.Location]; !present {
-				options := &gitutils.GitCloneOptions{BaseDir: path.Join(checkMateBaseDir, "code")}
+				options := &gitutils.GitCloneOptions{BaseDir: path.Join(pm.GetCodeBaseDir(), project.ID)}
 				if service, err := gitConfig.FindService(p.GitServiceID); err == nil {
 					options.Auth = service.MakeAuth()
 				}
