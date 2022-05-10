@@ -162,12 +162,18 @@ func cloneRepositories(ctx context.Context, project *projects.Project, pm projec
 		GitServices: make(map[gitutils.GitServiceType]map[string]*gitutils.GitService),
 	}
 
-	confManager, err := gitutils.NewDBGitConfigManager(pm.GetBaseDir())
+	confManager, err := pm.GetGitConfigManager()
 	if err == nil {
 		if conf, err := confManager.GetConfig(); err == nil {
 			gitConfig = conf
+		} else {
+			log.Printf("Error getting Config service: %v", err)
+
 		}
+	} else {
+		log.Printf("Error getting DB Config manager: %v", err)
 	}
+
 	for _, p := range repositories {
 		switch p.LocationType {
 		case "filesystem":
@@ -177,6 +183,8 @@ func cloneRepositories(ctx context.Context, project *projects.Project, pm projec
 				options := &gitutils.GitCloneOptions{BaseDir: path.Join(pm.GetCodeBaseDir(), project.ID)}
 				if service, err := gitConfig.FindService(p.GitServiceID); err == nil {
 					options.Auth = service.MakeAuth()
+				} else {
+					log.Printf("Error finding service: %v, Project: %#v, %#v", err, p, gitConfig)
 				}
 				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
 					repoMap[p.Location] = repo
