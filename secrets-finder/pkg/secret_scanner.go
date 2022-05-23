@@ -74,14 +74,6 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	//a diagnostics collect function that fixes location for git repositories
 	//and multiplexes the diagnostic to all provided diagnostic consumers
 	transposePathsToRepoBaseDiagnosticConsumer := func(diagnostic *diagnostics.SecurityDiagnostic) {
-		// location := *diagnostic.Location
-		// for loc, repo := range repoMapper {
-		// 	location = strings.Replace(location, loc, repo, 1)
-		// }
-		// diagnostic.Location = &location
-		// if repo, present := repoMapper[*diagnostic.Location]; present {
-		// 	diagnostic.Location = &repo
-		// }
 		loc := transposePath(*diagnostic.Location)
 		diagnostic.Location = &loc
 		for _, consumer := range consumers {
@@ -137,7 +129,7 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 		mux.ConsumePath(path)
 	}
 
-	//3. cleanup: delete checked out repositories
+	//3. cleanup: delete checked out repositories if required
 	if proj.DeleteCheckedOutCode {
 		for _, r := range repositories {
 			os.RemoveAll(r)
@@ -180,18 +172,20 @@ func cloneRepositories(ctx context.Context, project *projects.Project, pm projec
 			local = append(local, p.Location)
 		case "git":
 			if _, present := repoMap[p.Location]; !present {
-				options := &gitutils.GitCloneOptions{BaseDir: path.Join(pm.GetCodeBaseDir(), project.ID)}
+				options := &gitutils.GitCloneOptions{
+					BaseDir: path.Join(pm.GetCodeBaseDir(), project.ID),
+					Depth:   1, //shallow
+				}
 				if service, err := gitConfig.FindService(p.GitServiceID); err == nil {
 					options.Auth = service.MakeAuth()
 				} else {
-					log.Printf("Error finding service: %v, Project: %#v, %#v", err, p, gitConfig)
+					log.Printf("Error finding service: %v, Project: %#v", err, p)
 				}
 				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
 					repoMap[p.Location] = repo
 				} else {
 					log.Printf("%v", err)
 				}
-
 			}
 		default:
 			//ignore any other types of repos
