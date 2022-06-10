@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -51,7 +52,7 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	}
 
 	//get paths and check out repositories as may be necessary
-	repositories, local := cloneRepositories(ctx, &proj, pm)
+	repositories, local := cloneRepositories(ctx, &proj, scanID, pm, progressCallback)
 	paths := local
 	//reverse map local (temporary code checkout) paths to git URLs
 	repoMapper := make(map[string]string)
@@ -145,7 +146,7 @@ func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
 
 //cloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 //and the second argument are non-git local paths
-func cloneRepositories(ctx context.Context, project *projects.Project, pm projects.ProjectManager) (map[string]string, []string) {
+func cloneRepositories(ctx context.Context, project *projects.Project, scanID string, pm projects.ProjectManager, progressMonitor func(diagnostics.Progress)) (map[string]string, []string) {
 
 	repoMap := make(map[string]string)
 	local := []string{}
@@ -166,7 +167,8 @@ func cloneRepositories(ctx context.Context, project *projects.Project, pm projec
 		log.Printf("Error getting DB Config manager: %v", err)
 	}
 
-	for _, p := range repositories {
+	repoCount := int64(len(repositories))
+	for i, p := range repositories {
 		switch p.LocationType {
 		case "filesystem":
 			local = append(local, p.Location)
@@ -181,6 +183,13 @@ func cloneRepositories(ctx context.Context, project *projects.Project, pm projec
 				} else {
 					log.Printf("Error finding service: %v, Project: %#v", err, p)
 				}
+				progressMonitor(diagnostics.Progress{
+					ProjectID:   project.ID,
+					ScanID:      scanID,
+					Position:    int64(i),
+					Total:       repoCount,
+					CurrentFile: fmt.Sprintf("analysing branches of repository %s", p.Location),
+				})
 				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
 					repoMap[p.Location] = repo
 				} else {
