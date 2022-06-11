@@ -188,7 +188,7 @@ func cloneRepositories(ctx context.Context, project *projects.Project, scanID st
 					ScanID:      scanID,
 					Position:    int64(i),
 					Total:       repoCount,
-					CurrentFile: fmt.Sprintf("analysing branches of repository %s", p.Location),
+					CurrentFile: fmt.Sprintf("cloning repository %s", p.Location),
 				})
 				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
 					repoMap[p.Location] = repo
