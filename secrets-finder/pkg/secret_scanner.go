@@ -114,8 +114,11 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	//we are now ready to scan for secrets
 
 	//1. search for files to scan
+	log.Printf("Searching for files")
 	allFiles := util.FindFiles(paths)
 	fileCount := len(allFiles)
+
+	log.Printf("Found %d files", fileCount)
 
 	//2. scan them (mux.ConsumePath), sending progress indicators
 	for index, path := range allFiles {
@@ -129,6 +132,8 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 		progressCallback(progress)
 		mux.ConsumePath(path)
 	}
+
+	log.Printf("Finished scanning")
 
 	//3. cleanup: delete checked out repositories if required
 	if proj.DeleteCheckedOutCode {
@@ -193,6 +198,7 @@ func cloneRepositories(ctx context.Context, project *projects.Project, scanID st
 				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
 					repoMap[p.Location] = repo
 				} else {
+					repoMap[p.Location] = repo
 					log.Printf("%v", err)
 				}
 			}
