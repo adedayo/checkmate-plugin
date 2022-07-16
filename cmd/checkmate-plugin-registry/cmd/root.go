@@ -35,7 +35,6 @@ import (
 	"fmt"
 	"os"
 
-	host "github.com/adedayo/checkmate-plugin/cmd/checkmate-plugin-registry/pkg"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -55,9 +54,9 @@ var rootCmd = &cobra.Command{
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 
-		for _, meta := range host.GetAllPluginMetadata(pluginPaths) {
-			fmt.Printf("%#v\n", meta)
-		}
+		// for _, meta := range host.GetAllPluginMetadata(pluginPaths) {
+		// 	fmt.Printf("%#v\n", meta)
+		// }
 	},
 }
 

@@ -53,43 +53,43 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 
 	//get paths and check out repositories as may be necessary
 	repositories, local := cloneRepositories(ctx, &proj, scanID, pm, progressCallback)
-	paths := local
+
+	paths, locID := toPathsandLocationIDs(local, repositories)
+
 	//reverse map local (temporary code checkout) paths to git URLs
-	repoMapper := make(map[string]string)
-	for repo, path := range repositories {
-		paths = append(paths, path)
-		repoMapper[path] = repo
-	}
+	// repoMapper := make(map[string]string)
+	// for repo, path := range repositories {
+	// 	paths = append(paths, path)
+	// 	repoMapper[path] = repo
+	// }
 
-	transposePath := func(location string) string {
-		for localPath, repo := range repoMapper {
-			location = strings.Replace(location, localPath, repo, 1)
-		}
-
-		if repo, present := repoMapper[location]; present {
-			return repo
-		}
-		return location
-	}
+	transposePath := locationTransposer(paths, locID)
 
 	//a diagnostics collect function that fixes location for git repositories
 	//and multiplexes the diagnostic to all provided diagnostic consumers
 	transposePathsToRepoBaseDiagnosticConsumer := func(diagnostic *diagnostics.SecurityDiagnostic) {
-		loc := transposePath(*diagnostic.Location)
-		diagnostic.Location = &loc
+		location := transposePath(util.RepositoryIndexedFile{
+			RepositoryIndex: diagnostic.RepositoryIndex,
+			File:            *diagnostic.Location})
+		diagnostic.Location = &location
 		for _, consumer := range consumers {
 			consumer.ReceiveDiagnostic(diagnostic)
 		}
 	}
 
 	//set up secret finders as path consumers
-	pathConsumers := []util.PathConsumer{
-		//we always do confidential files search
-		&confidentialFilesFinder{
-			ExclusionProvider: scanner.options.Exclusions,
-			options:           scanner.options,
-		},
+	size := 1
+	if !scanner.options.ConfidentialFilesOnly {
+		size = 2
 	}
+
+	pathConsumers := make([]util.PathConsumer, 0, size)
+
+	//we always do confidential files search
+	pathConsumers = append(pathConsumers, &confidentialFilesFinder{
+		ExclusionProvider: scanner.options.Exclusions,
+		options:           scanner.options,
+	})
 
 	if !scanner.options.ConfidentialFilesOnly {
 		pathConsumers = append(pathConsumers, &pathBasedSourceSecretFinder{
@@ -121,16 +121,16 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	log.Printf("Found %d files", fileCount)
 
 	//2. scan them (mux.ConsumePath), sending progress indicators
-	for index, path := range allFiles {
+	for index, rif := range allFiles {
 		progress := diagnostics.Progress{
 			ProjectID:   projectID,
 			ScanID:      scanID,
-			CurrentFile: transposePath(path),
+			CurrentFile: transposePath(rif),
 			Position:    int64(index + 1),
 			Total:       int64(fileCount),
 		}
 		progressCallback(progress)
-		mux.ConsumePath(path)
+		mux.ConsumePath(rif)
 	}
 
 	log.Printf("Finished scanning")
@@ -140,6 +140,39 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 		for _, r := range repositories {
 			os.RemoveAll(r)
 		}
+	}
+}
+
+//create a location ID for each repository/local path
+//align paths[id] to the corresponding loc[id] map
+func toPathsandLocationIDs(local []string, repositories map[string]string) ([]string, map[int]string) {
+	paths := make([]string, len(local)+len(repositories))
+
+	locID := make(map[int]string)
+	id := 0
+	for _, p := range local {
+		locID[id] = p
+		paths[id] = p
+		id++
+	}
+	for repo, localPath := range repositories {
+		locID[id] = repo
+		paths[id] = localPath
+		id++
+	}
+	return paths, locID
+}
+
+func locationTransposer(paths []string, locID map[int]string) func(util.RepositoryIndexedFile) string {
+
+	return func(location util.RepositoryIndexedFile) string {
+
+		path := location.File
+		if repo, exists := locID[location.RepositoryIndex]; exists && location.RepositoryIndex < len(paths) {
+			localPath := paths[location.RepositoryIndex]
+			path = strings.Replace(path, localPath, repo, 1)
+		}
+		return path
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/adedayo/checkmate-core/pkg/code"
 	"github.com/adedayo/checkmate-core/pkg/diagnostics"
+	"github.com/adedayo/checkmate-core/pkg/util"
 )
 
 func TestFindSecret(t *testing.T) {
@@ -197,7 +198,7 @@ IAuthUserRequest,
 		t.Run(tt.name, func(t *testing.T) {
 			path := fmt.Sprintf("Filename%s", tt.extension) // dummy path
 			gotResult := false
-			for got := range FindSecret(path, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, path, options), true) {
+			for got := range FindSecret(util.RepositoryIndexedFile{RepositoryIndex: 0, File: path}, strings.NewReader(tt.value), GetFinderForFileType(tt.extension, util.RepositoryIndexedFile{RepositoryIndex: 0, File: path}, options), true) {
 				if tt.shouldNotDetect {
 					t.Errorf("Result Not expected, but Got %#v", got)
 				}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	common "github.com/adedayo/checkmate-core/pkg"
+	"github.com/adedayo/checkmate-core/pkg/util"
 )
 
 /**
@@ -103,7 +104,7 @@ var (
 )
 
 //TODO: Make pre- and post-validating functions in addition to the regex. e.g. string must also contain numbers, upper/lowercases
-func makeVendorSecretsFinders(options SecretSearchOptions) []common.ResourceToSecurityDiagnostics {
+func makeVendorSecretsFinders(options SecretSearchOptions, rif util.RepositoryIndexedFile) []common.ResourceToSecurityDiagnostics {
 
 	if len(vendorFinders) == 0 {
 		for id, re := range vendorSecrets {
@@ -111,6 +112,7 @@ func makeVendorSecretsFinders(options SecretSearchOptions) []common.ResourceToSe
 				secretFinder{
 					ExclusionProvider: options.Exclusions,
 					options:           options,
+					rif:               rif,
 				},
 			}
 			sf.providerID = id

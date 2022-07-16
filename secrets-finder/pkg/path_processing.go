@@ -13,6 +13,7 @@ import (
 	common "github.com/adedayo/checkmate-core/pkg"
 	"github.com/adedayo/checkmate-core/pkg/diagnostics"
 	gitutils "github.com/adedayo/checkmate-core/pkg/git"
+	util "github.com/adedayo/checkmate-core/pkg/util"
 )
 
 var (
@@ -47,7 +48,8 @@ type confidentialFilesFinder struct {
 	options SecretSearchOptions
 }
 
-func (cff confidentialFilesFinder) ConsumePath(path string) {
+func (cff confidentialFilesFinder) ConsumePath(rif util.RepositoryIndexedFile) {
+	path := rif.File
 	isTestFile := testFile.MatchString(path)
 	if confidential, why := common.IsConfidentialFile(path); confidential {
 
@@ -71,8 +73,9 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 								Confidence:  diagnostics.High,
 							},
 						},
-						Excluded: true,
-						SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
+						Excluded:        true,
+						SHA256:          computeFileHash(cff.options.CalculateChecksum, path),
+						RepositoryIndex: rif.RepositoryIndex,
 					}
 					issue.AddTag("test")
 					cff.Broadcast(&issue)
@@ -97,8 +100,9 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 							Confidence:  diagnostics.High,
 						},
 					},
-					Excluded: true,
-					SHA256:   computeFileHash(cff.options.CalculateChecksum, path),
+					Excluded:        true,
+					SHA256:          computeFileHash(cff.options.CalculateChecksum, path),
+					RepositoryIndex: rif.RepositoryIndex,
 				}
 				if isTestFile {
 					issue.AddTag("test")
@@ -124,6 +128,7 @@ func (cff confidentialFilesFinder) ConsumePath(path string) {
 					evidence,
 				},
 			},
+			RepositoryIndex: rif.RepositoryIndex,
 		}
 		if isTestFile {
 			issue.AddTag("test")
@@ -145,8 +150,9 @@ type pathBasedSourceSecretFinder struct {
 	options    SecretSearchOptions
 }
 
-func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
+func (pathBSF pathBasedSourceSecretFinder) ConsumePath(rif util.RepositoryIndexedFile) {
 
+	path := rif.File
 	isTestFile := testFile.MatchString(path)
 
 	if pathBSF.options.Verbose {
@@ -169,8 +175,9 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 							Confidence:  diagnostics.High,
 						},
 					},
-					Excluded: true,
-					SHA256:   computeFileHash(pathBSF.options.CalculateChecksum, path),
+					Excluded:        true,
+					SHA256:          computeFileHash(pathBSF.options.CalculateChecksum, path),
+					RepositoryIndex: rif.RepositoryIndex,
 				}
 				issue.AddTag("test")
 				pathBSF.Broadcast(&issue)
@@ -196,7 +203,8 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 						Confidence:  diagnostics.High,
 					},
 				},
-				Excluded: true,
+				Excluded:        true,
+				RepositoryIndex: rif.RepositoryIndex,
 			}
 			if isTestFile {
 				issue.AddTag("test")
@@ -227,8 +235,9 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 									Confidence:  diagnostics.High,
 								},
 							},
-							Excluded: true,
-							SHA256:   computeFileHash(pathBSF.options.CalculateChecksum, path),
+							Excluded:        true,
+							SHA256:          computeFileHash(pathBSF.options.CalculateChecksum, path),
+							RepositoryIndex: rif.RepositoryIndex,
 						}
 						if isTestFile {
 							issue.AddTag("test")
@@ -247,7 +256,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 					}
 				}
 			}
-			for issue := range FindSecret(path, f, GetFinderForFileType(ext, path, pathBSF.options), pathBSF.options.ShowSource) {
+			for issue := range FindSecret(rif, f, GetFinderForFileType(ext, rif, pathBSF.options), pathBSF.options.ShowSource) {
 				issue.Location = &path
 				if isTestFile {
 					issue.AddTag("test")
@@ -272,6 +281,7 @@ func (pathBSF pathBasedSourceSecretFinder) ConsumePath(path string) {
 						Confidence:  diagnostics.High,
 					},
 				},
+				RepositoryIndex: rif.RepositoryIndex,
 			}
 			if isTestFile {
 				issue.AddTag("test")
