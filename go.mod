@@ -3,7 +3,7 @@ module github.com/adedayo/checkmate-plugin
 go 1.18
 
 require (
-	github.com/adedayo/checkmate-core v0.8.5
+	github.com/adedayo/checkmate-core v0.8.6
 	github.com/golang/protobuf v1.5.2
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/cobra v1.4.0
@@ -48,4 +48,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// replace github.com/adedayo/checkmate-core v0.8.5 => ../checkmate-core
+// replace github.com/adedayo/checkmate-core v0.8.6 => ../checkmate-core
