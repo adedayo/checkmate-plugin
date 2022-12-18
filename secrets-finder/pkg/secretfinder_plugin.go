@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"fmt"
 	"os"
 
 	common "github.com/adedayo/checkmate-core/pkg"
@@ -53,8 +54,8 @@ import (
 // 	return nil
 // }
 
-//SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
-//Streams back security diagnostics and paths
+// SearchSecretsOnPaths searches for secrets on indicated paths (may include local paths and git repositories)
+// Streams back security diagnostics and paths
 func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *diagnostics.SecurityDiagnostic, chan []util.RepositoryIndexedFile) {
 	out := make(chan *diagnostics.SecurityDiagnostic)
 	pathsOut := make(chan []util.RepositoryIndexedFile)
@@ -79,11 +80,13 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *di
 		// 	diagnostic.Location = &repo
 		// }
 
-		location := pathTransposer(util.RepositoryIndexedFile{
+		location, branch := pathTransposer(util.RepositoryIndexedFile{
 			RepositoryIndex: diagnostic.RepositoryIndex,
 			File:            *diagnostic.Location,
 		})
-
+		if branch != "" {
+			diagnostic.AddTag(fmt.Sprintf("branch=%s", branch))
+		}
 		diagnostic.Location = &location
 		out <- diagnostic
 	}
@@ -123,7 +126,7 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *di
 		defer func() {
 			//clean downloaded repositories
 			for _, r := range repositories {
-				os.RemoveAll(r)
+				os.RemoveAll(r.Location)
 			}
 			close(out)
 			pathsOut <- allFiles

@@ -23,10 +23,10 @@ var (
 	TenMB                           = int64(1024 * 1000 * 10) // 10Mb
 )
 
-//determineAndCloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
-//and the second argument are non-git local paths
-func determineAndCloneRepositories(paths []string) (map[string]string, []string) {
-	repoMap := make(map[string]string)
+// determineAndCloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
+// and the second argument are non-git local paths
+func determineAndCloneRepositories(paths []string) (map[string]gitutils.CloneDetail, []string) {
+	repoMap := make(map[string]gitutils.CloneDetail)
 	local := []string{}
 	for _, p := range paths {
 		if !gitURL.MatchString(p) {
