@@ -80,13 +80,23 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *di
 		// 	diagnostic.Location = &repo
 		// }
 
-		location, branch := pathTransposer(util.RepositoryIndexedFile{
+		location, branch, cloneDetail := pathTransposer(util.RepositoryIndexedFile{
 			RepositoryIndex: diagnostic.RepositoryIndex,
 			File:            *diagnostic.Location,
 		})
+		//add branch as a tag, if it exists
 		if branch != "" {
 			diagnostic.AddTag(fmt.Sprintf("branch=%s", branch))
 		}
+
+		//add other tags from attributes found about the repository
+		if cloneDetail != nil && cloneDetail.Repository != nil && cloneDetail.Repository.Attributes != nil {
+			attrs := *cloneDetail.Repository.Attributes
+			for k, v := range attrs {
+				diagnostic.AddTag(fmt.Sprintf("%s=%v", k, v))
+			}
+		}
+
 		diagnostic.Location = &location
 		out <- diagnostic
 	}
@@ -126,7 +136,7 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *di
 		defer func() {
 			//clean downloaded repositories
 			for _, r := range repositories {
-				os.RemoveAll(r.Location)
+				os.RemoveAll(r.CloneDetail.Location)
 			}
 			close(out)
 			pathsOut <- allFiles

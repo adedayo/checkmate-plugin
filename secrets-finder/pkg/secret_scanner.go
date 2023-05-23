@@ -19,7 +19,7 @@ type SecretScanner struct {
 	options SecretSearchOptions
 }
 
-func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID string, pm projects.ProjectManager,
+func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID string, pm projects.ProjectManager, repoStatusChecker projects.RepositoryStatusChecker,
 	progressCallback func(diagnostics.Progress), consumers ...diagnostics.SecurityDiagnosticsConsumer) {
 
 	//ensure project and scan config exist
@@ -52,7 +52,8 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	}
 
 	//get paths and check out repositories as may be necessary
-	repositories, local := cloneRepositories(ctx, &proj, scanID, pm, progressCallback)
+	repositories, local := cloneRepositories(ctx, &proj, scanID, pm,
+		repoStatusChecker, progressCallback)
 
 	paths, locID := toPathsandLocationIDs(local, repositories)
 
@@ -68,13 +69,24 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	//a diagnostics collect function that fixes location for git repositories
 	//and multiplexes the diagnostic to all provided diagnostic consumers
 	transposePathsToRepoBaseDiagnosticConsumer := func(diagnostic *diagnostics.SecurityDiagnostic) {
-		location, branch := transposePath(util.RepositoryIndexedFile{
+		location, branch, cloneDetail := transposePath(util.RepositoryIndexedFile{
 			RepositoryIndex: diagnostic.RepositoryIndex,
 			File:            *diagnostic.Location})
 		diagnostic.Location = &location
+
+		//add branch as a tag, if it exists
 		if branch != "" {
 			diagnostic.AddTag(fmt.Sprintf("branch=%s", branch))
 		}
+
+		//add other tags from attributes found about the repository
+		if cloneDetail != nil && cloneDetail.Repository != nil && cloneDetail.Repository.Attributes != nil {
+			attrs := *cloneDetail.Repository.Attributes
+			for k, v := range attrs {
+				diagnostic.AddTag(fmt.Sprintf("%s=%v", k, v))
+			}
+		}
+
 		for _, consumer := range consumers {
 			consumer.ReceiveDiagnostic(diagnostic)
 		}
@@ -123,7 +135,7 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 
 	//2. scan them (mux.ConsumePath), sending progress indicators
 	for index, rif := range allFiles {
-		f, _ := transposePath(rif)
+		f, _, _ := transposePath(rif)
 		progress := diagnostics.Progress{
 			ProjectID:   projectID,
 			ScanID:      scanID,
@@ -138,47 +150,53 @@ func (scanner SecretScanner) Scan(ctx context.Context, projectID string, scanID 
 	//3. cleanup: delete checked out repositories if required
 	if proj.DeleteCheckedOutCode {
 		for _, r := range repositories {
-			os.RemoveAll(r.Location)
+			os.RemoveAll(r.CloneDetail.Location)
 		}
 	}
 }
 
 // create a location ID for each repository/local path
 // align paths[id] to the corresponding loc[id] map
-func toPathsandLocationIDs(local []string, repositories map[string]gitutils.CloneDetail) ([]string, map[int]gitutils.CloneDetail) {
+func toPathsandLocationIDs(local []string, repositories map[string]repoCloneAndDetail) ([]string, map[int]repoCloneAndDetail) {
 	paths := make([]string, len(local)+len(repositories))
 
-	locID := make(map[int]gitutils.CloneDetail)
+	locID := make(map[int]repoCloneAndDetail)
 	id := 0
 	for _, p := range local {
-		locID[id] = gitutils.CloneDetail{
-			Location:   p,
-			Repository: p,
+		locID[id] = repoCloneAndDetail{
+			CloneDetail: gitutils.CloneDetail{
+				Location:   p,
+				Repository: p,
+			},
 		}
 		paths[id] = p
 		id++
 	}
 	for _, detail := range repositories {
 		locID[id] = detail
-		paths[id] = detail.Location
+		paths[id] = detail.CloneDetail.Location
 		id++
 	}
 	return paths, locID
 }
 
-func locationTransposer(paths []string, locID map[int]gitutils.CloneDetail) func(util.RepositoryIndexedFile) (transposedLocation, branch string) {
+func locationTransposer(paths []string, locID map[int]repoCloneAndDetail) func(util.RepositoryIndexedFile) (transposedLocation, branch string, cloneDetail *repoCloneAndDetail) {
 
-	return func(location util.RepositoryIndexedFile) (string, string) {
+	return func(location util.RepositoryIndexedFile) (string, string, *repoCloneAndDetail) {
 		transposedLocation := location.File
 		branch := ""
-		if repo, exists := locID[location.RepositoryIndex]; exists && location.RepositoryIndex < len(paths) {
-			localPath := paths[location.RepositoryIndex]
-			if repo.Branch != nil {
-				branch = *repo.Branch
+		var cd *repoCloneAndDetail
+		if repo, exists := locID[location.RepositoryIndex]; exists {
+			cd = &repo
+			if location.RepositoryIndex < len(paths) {
+				localPath := paths[location.RepositoryIndex]
+				if repo.CloneDetail.Branch != nil {
+					branch = *repo.CloneDetail.Branch
+				}
+				transposedLocation = strings.Replace(transposedLocation, localPath, repo.CloneDetail.Repository, 1)
 			}
-			transposedLocation = strings.Replace(transposedLocation, localPath, repo.Repository, 1)
 		}
-		return transposedLocation, branch
+		return transposedLocation, branch, cd
 	}
 }
 
@@ -190,9 +208,10 @@ func MakeSecretScanner(config SecretSearchOptions) SecretScanner {
 
 // cloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 // and the second argument are non-git local paths
-func cloneRepositories(ctx context.Context, project *projects.Project, scanID string, pm projects.ProjectManager, progressMonitor func(diagnostics.Progress)) (map[string]gitutils.CloneDetail, []string) {
+func cloneRepositories(ctx context.Context, project *projects.Project, scanID string, pm projects.ProjectManager,
+	statusChecker projects.RepositoryStatusChecker, progressMonitor func(diagnostics.Progress)) (map[string]repoCloneAndDetail, []string) {
 
-	repoMap := make(map[string]gitutils.CloneDetail)
+	repoMap := make(map[string]repoCloneAndDetail)
 	local := []string{}
 	repositories := project.Repositories
 	gitConfig := &gitutils.GitServiceConfig{
@@ -234,10 +253,21 @@ func cloneRepositories(ctx context.Context, project *projects.Project, scanID st
 					Total:       repoCount,
 					CurrentFile: fmt.Sprintf("cloning repository %s", p.Location),
 				})
+				//make a call to the git server API to check the status of this repo, e.g. archived, disabled etc.
+				rp, err := statusChecker(ctx, pm, &p)
+				if err != nil {
+					rp = &p
+				}
 				if repo, err := gitutils.Clone(ctx, p.Location, options); err == nil {
-					repoMap[p.Location] = repo
+					repoMap[p.Location] = repoCloneAndDetail{
+						Repository:  rp,
+						CloneDetail: repo,
+					}
 				} else {
-					repoMap[p.Location] = repo
+					repoMap[p.Location] = repoCloneAndDetail{
+						Repository:  rp,
+						CloneDetail: repo,
+					}
 					log.Printf("%v", err)
 				}
 			}
@@ -246,4 +276,9 @@ func cloneRepositories(ctx context.Context, project *projects.Project, scanID st
 		}
 	}
 	return repoMap, local
+}
+
+type repoCloneAndDetail struct {
+	CloneDetail gitutils.CloneDetail
+	Repository  *projects.Repository
 }

@@ -25,8 +25,8 @@ var (
 
 // determineAndCloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 // and the second argument are non-git local paths
-func determineAndCloneRepositories(paths []string) (map[string]gitutils.CloneDetail, []string) {
-	repoMap := make(map[string]gitutils.CloneDetail)
+func determineAndCloneRepositories(paths []string) (map[string]repoCloneAndDetail, []string) {
+	repoMap := make(map[string]repoCloneAndDetail)
 	local := []string{}
 	for _, p := range paths {
 		if !gitURL.MatchString(p) {
@@ -34,7 +34,9 @@ func determineAndCloneRepositories(paths []string) (map[string]gitutils.CloneDet
 		} else {
 			if _, present := repoMap[p]; !present {
 				if repo, err := gitutils.Clone(context.Background(), p, &gitutils.GitCloneOptions{}); err == nil {
-					repoMap[p] = repo
+					repoMap[p] = repoCloneAndDetail{
+						CloneDetail: repo,
+					}
 				}
 			}
 		}
