@@ -94,6 +94,18 @@ func setupVendorSecrets() {
 	for desc, sec := range vendorSecretPatterns {
 		vendorSecrets[desc] = regexp.MustCompile(sec)
 	}
+
+	// Integrate Gitleaks rules
+	gitleaksPatterns := loadGitleaksPatterns()
+	for desc, regexStr := range gitleaksPatterns {
+		// Only add it if we don't already have our own rule for it
+		// to prevent duplicates or overriding Checkmate specific rules.
+		if _, exists := vendorSecrets[desc]; !exists {
+			// We already compiled it inside loadGitleaksPatterns to check if Go supports it, 
+			// so MustCompile here is safe.
+			vendorSecrets[desc] = regexp.MustCompile(regexStr)
+		}
+	}
 }
 
 func setupSecretStringsIndicators() string {
