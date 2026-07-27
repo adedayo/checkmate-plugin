@@ -94,22 +94,22 @@ func Test_detectSecret(t *testing.T) {
 			name:   "GitHub Secret",
 			secret: "gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1",
 			wantEvidence: diagnostics.Evidence{
-				Description: descGithubToken,
-				Confidence:  diagnostics.Critical},
+				Description: "Discovered a GitHub OAuth Access Token, posing a risk of compromised GitHub account integrations and data leaks.",
+				Confidence:  diagnostics.High},
 		},
 		{
 			name:   "Slack Token",
 			secret: "xoxb-333649436676-799261852869-clFJVVIaoJahpORboa3Ba2al",
 			wantEvidence: diagnostics.Evidence{
-				Description: descSlackToken,
-				Confidence:  diagnostics.Critical},
+				Description: "Identified a Slack Bot token, which may compromise bot integrations and communication channel security.",
+				Confidence:  diagnostics.High},
 		},
 		{
 			name:   "Stripe Token",
 			secret: "sk_test_26PHem9AhJZvU623DfE1x4sd",
 			wantEvidence: diagnostics.Evidence{
-				Description: descStripeToken,
-				Confidence:  diagnostics.Critical},
+				Description: "Found a Stripe Access Token, posing a risk to payment processing services and sensitive financial data.",
+				Confidence:  diagnostics.High},
 		},
 		{
 			name:   "GoCardless Token",

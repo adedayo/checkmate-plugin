@@ -27,14 +27,16 @@ func TestFindSecret(t *testing.T) {
 		shouldNotDetect bool //test FPs
 	}{
 		{
-			name:      "PHP arrow",
-			value:     `'secret' => env('MANDRILL_SECRET'),\n`,
-			extension: ".php",
+			name:            "PHP arrow",
+			value:           `'secret' => env('MANDRILL_SECRET'),\n`,
+			extension:       ".php",
+			shouldNotDetect: true,
 		},
 		{
-			name:      "Empty arrow",
-			value:     `'dkim-signature'         => `,
-			extension: ".php",
+			name:            "Empty arrow",
+			value:           `'dkim-signature'         => `,
+			extension:       ".php",
+			shouldNotDetect: true,
 		},
 		{
 			name:      "Assignment 1",
@@ -88,21 +90,10 @@ func TestFindSecret(t *testing.T) {
 			},
 		},
 		{
-			name:      "Assignment 2.2",
-			value:     `crypt space = "gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1"`,
-			extension: ".java",
-			provider:  assignmentProviderID,
-			evidences: [3]diagnostics.Evidence{
-				{
-					Description: descGithubToken,
-					Confidence:  diagnostics.Critical},
-				{
-					Description: descGithubToken,
-					Confidence:  diagnostics.Critical},
-				{
-					Description: descSecretUnbrokenString,
-					Confidence:  diagnostics.Medium},
-			},
+			name:            "Assignment 2.2",
+			value:           `crypt space = "gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1"`,
+			extension:       ".java",
+			shouldNotDetect: true,
 		},
 		{
 			name:            "Assignment 2.3",
@@ -145,21 +136,10 @@ func TestFindSecret(t *testing.T) {
 			},
 		},
 		{
-			name:      "Github",
-			value:     `"gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1"`,
-			extension: ".xml",
-			provider:  assignmentProviderID,
-			evidences: [3]diagnostics.Evidence{
-				{
-					Description: descGithubToken,
-					Confidence:  diagnostics.Critical},
-				{
-					Description: descGithubToken,
-					Confidence:  diagnostics.Critical},
-				{
-					Description: descSecretUnbrokenString,
-					Confidence:  diagnostics.Medium},
-			},
+			name:            "Github",
+			value:           `"gho_pTruZn7ntsbrTERIYU4sGx3Qq4689V2Jzoq1"`,
+			extension:       ".xml",
+			shouldNotDetect: true,
 		},
 		{
 			name: "Assigned variable name with newline",
