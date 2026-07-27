@@ -3,7 +3,7 @@ module github.com/adedayo/checkmate-plugin
 go 1.26.1
 
 require (
-	github.com/adedayo/checkmate-core v1.0.9
+	github.com/adedayo/checkmate-core v1.0.10
 	github.com/golang/protobuf v1.5.4
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pelletier/go-toml/v2 v2.4.3
