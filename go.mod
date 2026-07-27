@@ -1,11 +1,12 @@
 module github.com/adedayo/checkmate-plugin
 
-go 1.21.0
+go 1.26.1
 
 require (
-	github.com/adedayo/checkmate-core v0.9.3
+	github.com/adedayo/checkmate-core v0.9.4
 	github.com/golang/protobuf v1.5.3
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	google.golang.org/grpc v1.55.0
@@ -29,7 +30,6 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/skeema/knownhosts v1.1.1 // indirect
@@ -52,3 +52,5 @@ require (
 )
 
 // replace github.com/adedayo/checkmate-core v0.9.3 => ../checkmate-core
+
+replace github.com/adedayo/checkmate-core v0.9.4 => ../checkmate-core
