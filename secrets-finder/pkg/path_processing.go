@@ -26,6 +26,7 @@ var (
 // determineAndCloneRepositories returns local paths after cloning git URLs. A map of git URL to the local map is the first argument
 // and the second argument are non-git local paths
 func determineAndCloneRepositories(paths []string) (map[string]repoCloneAndDetail, []string) {
+	fmt.Println("TESTING COMPILATION determineAndCloneRepositories")
 	repoMap := make(map[string]repoCloneAndDetail)
 	local := []string{}
 	for _, p := range paths {
@@ -37,6 +38,8 @@ func determineAndCloneRepositories(paths []string) (map[string]repoCloneAndDetai
 					repoMap[p] = repoCloneAndDetail{
 						CloneDetail: repo,
 					}
+				} else {
+					log.Printf("Failed to clone repository %s: %s\n", p, err.Error())
 				}
 			}
 		}

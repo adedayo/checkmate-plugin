@@ -61,15 +61,10 @@ func SearchSecretsOnPaths(paths []string, options SecretSearchOptions) (chan *di
 	pathsOut := make(chan []util.RepositoryIndexedFile)
 	repositories, local := determineAndCloneRepositories(paths)
 	pathTransposer := locationTransposer(toPathsandLocationIDs(local, repositories))
-	// paths = local
-	// for _, path := range repositories {
-	// 	paths = append(paths, path)
-	// }
-	// //reverse map local paths to git URLs
-	// repoMapper := make(map[string]string)
-	// for repo, loc := range repositories {
-	// 	repoMapper[loc] = repo
-	// }
+	paths = local
+	for _, r := range repositories {
+		paths = append(paths, r.CloneDetail.Location)
+	}
 	collector := func(diagnostic *diagnostics.SecurityDiagnostic) {
 		// location := *diagnostic.Location
 		// for loc, repo := range repoMapper {
